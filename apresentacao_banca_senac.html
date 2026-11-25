@@ -99,7 +99,7 @@
     }
 
     .slide[data-index="0"],
-    .slide[data-index="8"] {
+    .slide[data-index="7"] {
       justify-content: center;
     }
 
@@ -891,7 +891,7 @@
   <div class="deck">
     <header class="topbar">
       <div class="brand">NetWatch E6</div>
-      <div class="slide-counter" id="slideCounter">1 / 9</div>
+      <div class="slide-counter" id="slideCounter">1 / 8</div>
     </header>
 
     <main class="stage">
@@ -1166,11 +1166,11 @@
         </div>
       </section>
 
-      <!-- Slide 5 — Descoberta Rápida e Inteligente -->
+      <!-- Slide 5 — Como a Descoberta Funciona na Prática -->
       <section class="slide" data-index="4">
         <div class="slide-header">
-          <h2 class="slide-title">Descoberta Rápida e Inteligente</h2>
-          <p class="slide-lead">Varredura em duas etapas para detectar entradas e saídas quase em tempo real sem sobrecarregar a rede.</p>
+          <h2 class="slide-title">Como a Descoberta Funciona na Prática</h2>
+          <p class="slide-lead">Varredura rápida, identificação precisa e proteção automática de escopo para manter o desempenho estável em qualquer rede.</p>
         </div>
 
         <div class="metrics-row">
@@ -1180,7 +1180,7 @@
           </div>
           <div class="metric-card">
             <div class="metric-value">~3,6s</div>
-            <div class="metric-caption">Varredura completa da rede local</div>
+            <div class="metric-caption">Varredura completa da rede local (/24)</div>
           </div>
           <div class="metric-card">
             <div class="metric-value">16 portas</div>
@@ -1190,79 +1190,22 @@
 
         <div class="two-col">
           <div class="card">
-            <h3 class="card-title">Encontra aparelhos que bloqueiam ping</h3>
+            <h3 class="card-title">Detecção sem ping e teto automático /24</h3>
             <p class="card-text">
-              Combina testes rápidos de conexão TCP, consultas UDP e a tabela interna de rede do sistema para detectar celulares modernos e computadores mesmo quando o firewall bloqueia respostas tradicionais.
+              Combina testes TCP, UDP e tabela do sistema para achar aparelhos com firewall ativo, identificando fabricantes mesmo com MAC aleatório. Em redes grandes (/16 ou /20), recorta a busca para o bloco local de 254 IPs (/24) para evitar lentidão.
             </p>
           </div>
           <div class="card">
-            <h3 class="card-title">Identificação precisa</h3>
+            <h3 class="card-title">Como o NetWatch E6 age em redes IPv6?</h3>
             <p class="card-text">
-              Cruza o fabricante do endereço MAC com a resposta real dos serviços abertos na rede, garantindo identificação confiável de roteadores, servidores e terminais mesmo quando há uso de MAC aleatório.
+              A varredura ativa é focada em IPv4, onde uma rede local (/24) tem 254 endereços e é mapeada em ~3,6s. No IPv6 (/64), são cerca de 18 quintilhões de endereços, tornando inviável varrer IP por IP. Como redes atuais usam IPv4 e IPv6 juntos, o monitoramento opera normalmente pelo IPv4; em redes exclusivamente IPv6, o sistema não varre a faixa e depende apenas da tabela passiva de vizinhos (NDP).
             </p>
           </div>
         </div>
       </section>
 
-      <!-- Slide 6 — Proteção de Escopo em Redes Grandes -->
+      <!-- Slide 6 — Defesa Automática em Tempo Real (MITRE ATT&CK) -->
       <section class="slide" data-index="5">
-        <div class="slide-header">
-          <h2 class="slide-title">Proteção de Escopo em Redes Grandes</h2>
-          <p class="slide-lead">Como o NetWatch E6 evita travamentos quando conectado a redes corporativas ou públicas com milhares de dispositivos.</p>
-        </div>
-
-        <div class="two-col">
-          <div class="col-card">
-            <div>
-              <div class="col-tag neutral">O Risco (Redes /22, /20 ou /16)</div>
-              <h3 class="col-heading">Faixas extensas podem conter até 65.534 endereços IP</h3>
-              <ul class="clean-list neutral-list">
-                <li>Em redes grandes — como empresas, shoppings ou universidades — uma única faixa pode abranger até <strong>65.534 endereços IP</strong> (/16).</li>
-                <li>Tentar varrer todos os endereços de uma só vez em um smartphone comum causaria demora excessiva, alto consumo de bateria e travamento por falta de memória.</li>
-              </ul>
-            </div>
-          </div>
-
-          <div class="col-card">
-            <div>
-              <div class="col-tag">A Solução (Teto Automático /24)</div>
-              <h3 class="col-heading">Limite inteligente para o bloco local de 254 endereços</h3>
-              <ul class="clean-list">
-                <li>O sistema identifica automaticamente quando a rede é maior que /24 e aplica um <strong>limite de escopo</strong> imediato.</li>
-                <li>Em vez de varrer dezenas de milhares de IPs, ele recorta a varredura apenas para o <strong>bloco local de 254 endereços</strong> onde o aparelho está conectado.</li>
-                <li><strong>Resultado:</strong> o ciclo continua previsível (<strong>~3,6 segundos</strong>), com uso estável de memória e bateria.</li>
-              </ul>
-            </div>
-          </div>
-        </div>
-
-        <div class="scope-flow-bar">
-          <div class="scope-step">
-            <span class="scope-step-label">1. Rede detectada</span>
-            <span class="scope-step-value">10.0.0.0/16</span>
-            <span class="scope-step-sub">65.534 endereços possíveis</span>
-          </div>
-
-          <div class="scope-arrow">→</div>
-
-          <div class="scope-step">
-            <span class="scope-step-label">2. IP do NetWatch E6</span>
-            <span class="scope-step-value">10.0.15.42</span>
-            <span class="scope-step-sub">Segmento ativo identificado</span>
-          </div>
-
-          <div class="scope-arrow">→</div>
-
-          <div class="scope-step">
-            <span class="scope-step-label accent">3. Recorte automático aplicado</span>
-            <span class="scope-step-value">10.0.15.1 até 10.0.15.254</span>
-            <span class="scope-step-sub">Varre apenas 254 IPs em ~3,6s</span>
-          </div>
-        </div>
-      </section>
-
-      <!-- Slide 7 — Defesa Automática em Tempo Real (MITRE ATT&CK) -->
-      <section class="slide" data-index="6">
         <div class="slide-header" style="margin-bottom: 22px;">
           <h2 class="slide-title">Defesa Automática em Tempo Real</h2>
           <p class="slide-lead">Cinco sensores contínuos mapeados à matriz MITRE ATT&CK para detectar ataques e alterações na rede local.</p>
@@ -1349,8 +1292,8 @@
         </div>
       </section>
 
-      <!-- Slide 8 — Segurança, Autonomia e Limites Transparentes -->
-      <section class="slide" data-index="7">
+      <!-- Slide 7 — Segurança, Autonomia e Limites Transparentes -->
+      <section class="slide" data-index="6">
         <div class="slide-header">
           <h2 class="slide-title">Segurança, Autonomia e Limites Transparentes</h2>
           <p class="slide-lead">Operação isolada no próprio aparelho com clareza total sobre o alcance do monitoramento sem root.</p>
@@ -1384,8 +1327,8 @@
         </div>
       </section>
 
-      <!-- Slide 9 — Encerramento -->
-      <section class="slide" data-index="8">
+      <!-- Slide 8 — Encerramento -->
+      <section class="slide" data-index="7">
         <div class="closing-wrap">
           <h2 class="closing-statement">
             NetWatch E6 — Visibilidade, diagnóstico e defesa de rede na palma da mão, sem root e sem depender de computador.
