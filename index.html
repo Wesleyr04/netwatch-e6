@@ -1,0 +1,1586 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>NetWatch E6</title>
+  <style>
+    :root {
+      --bg: #0F1115;
+      --surface: #171A21;
+      --surface-hover: #1D212A;
+      --border: #262A34;
+      --border-active: #3B82F6;
+      --text: #F5F7FA;
+      --text-muted: #A1A7B3;
+      --accent: #3B82F6;
+      --safe: #10B981;
+      --warn: #F59E0B;
+      --crit: #EF4444;
+      --font: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    html, body {
+      width: 100%;
+      height: 100%;
+      background-color: var(--bg);
+      color: var(--text);
+      font-family: var(--font);
+      overflow: hidden;
+      -webkit-font-smoothing: antialiased;
+      user-select: none;
+    }
+
+    .deck {
+      display: flex;
+      flex-direction: column;
+      width: 100vw;
+      height: 100vh;
+      max-width: 1680px;
+      margin: 0 auto;
+      padding: 36px 64px 28px;
+    }
+
+    /* Topo minimalista */
+    .topbar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      height: 36px;
+      flex-shrink: 0;
+      border-bottom: 1px solid var(--border);
+      padding-bottom: 16px;
+    }
+
+    .brand {
+      font-size: 16px;
+      font-weight: 600;
+      letter-spacing: -0.01em;
+      color: var(--text);
+    }
+
+    .slide-counter {
+      font-size: 15px;
+      font-weight: 500;
+      color: var(--text-muted);
+      font-variant-numeric: tabular-nums;
+    }
+
+    /* Área principal 16:9 bem preenchida */
+    .stage {
+      position: relative;
+      flex: 1;
+      display: flex;
+      align-items: center;
+      width: 100%;
+      overflow: hidden;
+    }
+
+    .slide {
+      position: absolute;
+      inset: 0;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      opacity: 0;
+      pointer-events: none;
+      transform: translateY(10px);
+      transition: opacity 0.28s ease, transform 0.28s ease;
+      padding: 24px 0;
+    }
+
+    .slide.active {
+      opacity: 1;
+      pointer-events: auto;
+      transform: translateY(0);
+    }
+
+    /* Tipografia */
+    .slide-header {
+      margin-bottom: 32px;
+    }
+
+    .slide-title {
+      font-size: clamp(36px, 3.2vw, 50px);
+      font-weight: 700;
+      letter-spacing: -0.025em;
+      line-height: 1.12;
+      color: var(--text);
+      margin-bottom: 12px;
+    }
+
+    .slide-lead {
+      font-size: clamp(19px, 1.45vw, 23px);
+      color: var(--text-muted);
+      line-height: 1.45;
+      max-width: 980px;
+      font-weight: 400;
+    }
+
+    /* Cartões e superfícies */
+    .card {
+      background-color: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 32px 36px;
+    }
+
+    .card-title {
+      font-size: clamp(21px, 1.55vw, 25px);
+      font-weight: 600;
+      color: var(--text);
+      letter-spacing: -0.015em;
+      margin-bottom: 12px;
+      line-height: 1.25;
+    }
+
+    .card-text {
+      font-size: clamp(18px, 1.3vw, 21px);
+      color: var(--text-muted);
+      line-height: 1.55;
+    }
+
+    /* Slide 1 - Capa 60% / 40% */
+    .hero-grid {
+      display: grid;
+      grid-template-columns: 1.45fr 1fr;
+      gap: 48px;
+      align-items: stretch;
+      width: 100%;
+    }
+
+    .hero-left {
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      padding-right: 16px;
+    }
+
+    .hero-title {
+      font-size: clamp(48px, 4.4vw, 68px);
+      font-weight: 750;
+      letter-spacing: -0.03em;
+      line-height: 1.05;
+      margin-bottom: 24px;
+      color: var(--text);
+    }
+
+    .hero-subtitle {
+      font-size: clamp(22px, 1.75vw, 28px);
+      line-height: 1.45;
+      color: var(--text-muted);
+      margin-bottom: 40px;
+      font-weight: 400;
+    }
+
+    .hero-pillars {
+      display: flex;
+      align-items: center;
+      gap: 18px;
+      font-size: clamp(18px, 1.3vw, 21px);
+      font-weight: 600;
+      color: var(--text);
+    }
+
+    .hero-pillars span.dot {
+      color: var(--accent);
+    }
+
+    .hero-right {
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      background-color: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 40px;
+    }
+
+    .summary-label {
+      font-size: 14px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: var(--text-muted);
+      margin-bottom: 24px;
+    }
+
+    .summary-list {
+      display: flex;
+      flex-direction: column;
+      gap: 24px;
+    }
+
+    .summary-item {
+      padding-bottom: 22px;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .summary-item:last-child {
+      padding-bottom: 0;
+      border-bottom: none;
+    }
+
+    .summary-item-title {
+      font-size: clamp(20px, 1.45vw, 24px);
+      font-weight: 600;
+      color: var(--text);
+      margin-bottom: 6px;
+    }
+
+    .summary-item-desc {
+      font-size: clamp(17px, 1.2vw, 19px);
+      color: var(--text-muted);
+    }
+
+    /* Slide 2 & Slide 6 - Duas colunas */
+    .two-col {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 36px;
+      width: 100%;
+      align-items: stretch;
+    }
+
+    .col-card {
+      background-color: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 42px 44px;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+    }
+
+    .col-tag {
+      font-size: 14px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: var(--accent);
+      margin-bottom: 18px;
+    }
+
+    .col-tag.neutral {
+      color: var(--text-muted);
+    }
+
+    .col-heading {
+      font-size: clamp(26px, 2vw, 32px);
+      font-weight: 650;
+      letter-spacing: -0.02em;
+      color: var(--text);
+      margin-bottom: 20px;
+      line-height: 1.25;
+    }
+
+    .col-body {
+      font-size: clamp(19px, 1.4vw, 22px);
+      color: var(--text-muted);
+      line-height: 1.6;
+    }
+
+    .clean-list {
+      list-style: none;
+      display: flex;
+      flex-direction: column;
+      gap: 18px;
+      margin-top: 8px;
+    }
+
+    .clean-list li {
+      font-size: clamp(18px, 1.3vw, 21px);
+      color: var(--text-muted);
+      line-height: 1.5;
+      padding-left: 22px;
+      position: relative;
+    }
+
+    .clean-list li strong {
+      color: var(--text);
+      font-weight: 600;
+    }
+
+    .clean-list li::before {
+      content: "";
+      position: absolute;
+      left: 0;
+      top: 11px;
+      width: 7px;
+      height: 7px;
+      border-radius: 50%;
+      background-color: var(--accent);
+    }
+
+    .clean-list.neutral-list li::before {
+      background-color: var(--text-muted);
+    }
+
+    /* Slide 3 - Topologia de Rede (70% / 30%) */
+    .topology-layout {
+      display: grid;
+      grid-template-columns: 2.25fr 1fr;
+      gap: 32px;
+      width: 100%;
+      align-items: stretch;
+    }
+
+    .topology-stage {
+      background-color: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 24px 28px 20px;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+    }
+
+    .topology-svg-wrap {
+      width: 100%;
+      flex: 1;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .topology-svg {
+      width: 100%;
+      height: auto;
+      max-height: 360px;
+      overflow: visible;
+    }
+
+    .topo-mode-bar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+      padding-top: 16px;
+      border-top: 1px solid var(--border);
+      margin-top: 10px;
+    }
+
+    .topo-mode-buttons {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .topo-mode-btn {
+      background-color: var(--bg);
+      color: var(--text-muted);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 9px 15px;
+      font-size: 15px;
+      font-weight: 500;
+      font-family: var(--font);
+      cursor: pointer;
+      transition: all 0.18s ease;
+    }
+
+    .topo-mode-btn:hover {
+      color: var(--text);
+      background-color: var(--surface-hover);
+    }
+
+    .topo-mode-btn.active {
+      color: var(--text);
+      border-color: var(--accent);
+      background-color: var(--surface-hover);
+    }
+
+    .topo-mode-caption {
+      font-size: 15px;
+      color: var(--text-muted);
+      text-align: right;
+    }
+
+    .topology-side {
+      background-color: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 32px 34px;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+    }
+
+    .topo-side-item {
+      padding-bottom: 22px;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .topo-side-item:last-child {
+      padding-bottom: 0;
+      border-bottom: none;
+    }
+
+    .topo-side-title {
+      font-size: clamp(19px, 1.35vw, 22px);
+      font-weight: 600;
+      color: var(--text);
+      margin-bottom: 8px;
+      line-height: 1.3;
+    }
+
+    .topo-side-desc {
+      font-size: clamp(16px, 1.15vw, 18px);
+      color: var(--text-muted);
+      line-height: 1.5;
+    }
+
+    @keyframes dashFlow {
+      to {
+        stroke-dashoffset: -28;
+      }
+    }
+
+    .flow-line {
+      stroke-dasharray: 7 7;
+      animation: dashFlow 1.1s linear infinite;
+    }
+
+    .topo-group {
+      opacity: 0;
+      transition: opacity 0.25s ease;
+      pointer-events: none;
+    }
+
+    .topo-group.visible {
+      opacity: 1;
+    }
+
+    /* Slide 3 - 5 Telas do App (Interativo) */
+    .tabs-layout {
+      display: grid;
+      grid-template-columns: 380px 1fr;
+      gap: 36px;
+      width: 100%;
+      align-items: stretch;
+    }
+
+    .tab-buttons {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    .tab-btn {
+      background-color: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 20px 24px;
+      text-align: left;
+      cursor: pointer;
+      transition: background-color 0.18s ease, border-color 0.18s ease;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      color: var(--text);
+      font-family: var(--font);
+    }
+
+    .tab-btn:hover {
+      background-color: var(--surface-hover);
+    }
+
+    .tab-btn.active {
+      border-color: var(--accent);
+      background-color: var(--surface-hover);
+    }
+
+    .tab-btn-name {
+      font-size: clamp(18px, 1.3vw, 21px);
+      font-weight: 600;
+    }
+
+    .tab-btn-num {
+      font-size: 15px;
+      font-weight: 500;
+      color: var(--text-muted);
+    }
+
+    .tab-btn.active .tab-btn-num {
+      color: var(--accent);
+    }
+
+    .tab-panel {
+      background-color: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 44px 48px;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+    }
+
+    .tab-panel-label {
+      font-size: 14px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: var(--accent);
+      margin-bottom: 14px;
+    }
+
+    .tab-panel-title {
+      font-size: clamp(28px, 2.2vw, 36px);
+      font-weight: 700;
+      letter-spacing: -0.02em;
+      color: var(--text);
+      margin-bottom: 18px;
+    }
+
+    .tab-panel-desc {
+      font-size: clamp(20px, 1.5vw, 24px);
+      color: var(--text-muted);
+      line-height: 1.55;
+      margin-bottom: 32px;
+    }
+
+    .tab-highlights {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 20px;
+      padding-top: 28px;
+      border-top: 1px solid var(--border);
+    }
+
+    .tab-highlight-item {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    .tab-highlight-title {
+      font-size: 18px;
+      font-weight: 600;
+      color: var(--text);
+    }
+
+    .tab-highlight-text {
+      font-size: 17px;
+      color: var(--text-muted);
+      line-height: 1.45;
+    }
+
+    /* Slide 4 - Descoberta Rápida */
+    .metrics-row {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 28px;
+      margin-bottom: 28px;
+    }
+
+    .metric-card {
+      background-color: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 32px 36px;
+    }
+
+    .metric-value {
+      font-size: clamp(40px, 3.4vw, 54px);
+      font-weight: 750;
+      letter-spacing: -0.03em;
+      color: var(--text);
+      margin-bottom: 10px;
+      line-height: 1;
+    }
+
+    .metric-caption {
+      font-size: clamp(18px, 1.3vw, 21px);
+      color: var(--text-muted);
+      line-height: 1.4;
+    }
+
+    /* Slide 6 - Proteção de Escopo em Redes Grandes */
+    .scope-flow-bar {
+      margin-top: 24px;
+      background-color: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 22px 28px;
+      display: grid;
+      grid-template-columns: 1fr auto 1fr auto 1.25fr;
+      align-items: center;
+      gap: 20px;
+    }
+
+    .scope-step {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    .scope-step-label {
+      font-size: 13px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: var(--text-muted);
+    }
+
+    .scope-step-label.accent {
+      color: var(--accent);
+    }
+
+    .scope-step-value {
+      font-size: clamp(18px, 1.3vw, 21px);
+      font-weight: 600;
+      color: var(--text);
+      line-height: 1.35;
+    }
+
+    .scope-step-sub {
+      font-size: 15px;
+      color: var(--text-muted);
+    }
+
+    .scope-arrow {
+      font-size: 20px;
+      color: var(--text-muted);
+      padding: 0 4px;
+      user-select: none;
+    }
+
+    /* Slide 5 - Defesa Automática MITRE ATT&CK */
+    .sensors-top-row {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 22px;
+      margin-bottom: 22px;
+    }
+
+    .sensors-bottom-row {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 22px;
+      margin-bottom: 24px;
+    }
+
+    .sensor-card {
+      background-color: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 24px 28px;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+    }
+
+    .sensor-header {
+      display: flex;
+      align-items: baseline;
+      justify-content: space-between;
+      gap: 12px;
+      margin-bottom: 10px;
+    }
+
+    .sensor-title {
+      font-size: clamp(19px, 1.35vw, 22px);
+      font-weight: 600;
+      color: var(--text);
+      letter-spacing: -0.01em;
+    }
+
+    .mitre-code {
+      font-size: 14px;
+      font-weight: 600;
+      color: var(--accent);
+      white-space: nowrap;
+    }
+
+    .sensor-desc {
+      font-size: clamp(17px, 1.18vw, 19px);
+      color: var(--text-muted);
+      line-height: 1.5;
+    }
+
+    /* Barra de demonstração de alerta no Slide 5 */
+    .demo-bar {
+      background-color: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 18px 28px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 24px;
+    }
+
+    .demo-status-group {
+      display: flex;
+      align-items: center;
+      gap: 18px;
+    }
+
+    .status-indicator {
+      display: inline-flex;
+      align-items: center;
+      gap: 10px;
+      font-size: 17px;
+      font-weight: 600;
+      padding: 8px 16px;
+      border-radius: 8px;
+      background-color: rgba(16, 185, 129, 0.12);
+      color: var(--safe);
+    }
+
+    .status-indicator.warning {
+      background-color: rgba(245, 158, 11, 0.14);
+      color: var(--warn);
+    }
+
+    .status-dot {
+      width: 9px;
+      height: 9px;
+      border-radius: 50%;
+      background-color: currentColor;
+    }
+
+    .demo-message {
+      font-size: 18px;
+      color: var(--text);
+    }
+
+    .demo-message span.muted {
+      color: var(--text-muted);
+    }
+
+    .demo-actions {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .btn-action {
+      background-color: var(--bg);
+      color: var(--text);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 10px 18px;
+      font-size: 16px;
+      font-weight: 500;
+      font-family: var(--font);
+      cursor: pointer;
+      transition: border-color 0.18s ease, background-color 0.18s ease;
+      white-space: nowrap;
+    }
+
+    .btn-action:hover {
+      border-color: var(--accent);
+      background-color: var(--surface-hover);
+    }
+
+    /* Slide 7 - Encerramento */
+    .closing-wrap {
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: flex-start;
+      max-width: 1180px;
+      padding: 20px 0;
+    }
+
+    .closing-statement {
+      font-size: clamp(38px, 3.5vw, 56px);
+      font-weight: 700;
+      letter-spacing: -0.025em;
+      line-height: 1.18;
+      color: var(--text);
+      margin-bottom: 48px;
+    }
+
+    .closing-pillars {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 28px;
+      width: 100%;
+      margin-bottom: 40px;
+    }
+
+    .closing-pillar-card {
+      background-color: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 28px 32px;
+    }
+
+    .closing-pillar-title {
+      font-size: 22px;
+      font-weight: 600;
+      color: var(--text);
+      margin-bottom: 8px;
+    }
+
+    .closing-pillar-desc {
+      font-size: 18px;
+      color: var(--text-muted);
+      line-height: 1.45;
+    }
+
+    .closing-ready {
+      display: inline-flex;
+      align-items: center;
+      gap: 12px;
+      font-size: 18px;
+      color: var(--text-muted);
+    }
+
+    .closing-ready-dot {
+      width: 9px;
+      height: 9px;
+      border-radius: 50%;
+      background-color: var(--safe);
+    }
+
+    /* Rodapé minimalista */
+    .bottombar {
+      display: flex;
+      align-items: center;
+      justify-content: flex-end;
+      height: 40px;
+      flex-shrink: 0;
+      gap: 10px;
+    }
+
+    .nav-arrow {
+      background-color: var(--surface);
+      border: 1px solid var(--border);
+      color: var(--text);
+      width: 40px;
+      height: 36px;
+      border-radius: 8px;
+      font-size: 16px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: background-color 0.15s ease, border-color 0.15s ease;
+    }
+
+    .nav-arrow:hover:not(:disabled) {
+      background-color: var(--surface-hover);
+      border-color: var(--accent);
+    }
+
+    .nav-arrow:disabled {
+      opacity: 0.35;
+      cursor: default;
+    }
+  </style>
+</head>
+<body>
+  <div class="deck">
+    <header class="topbar">
+      <div class="brand">NetWatch E6</div>
+      <div class="slide-counter" id="slideCounter">1 / 9</div>
+    </header>
+
+    <main class="stage">
+      <!-- Slide 1 — Capa -->
+      <section class="slide active" data-index="0">
+        <div class="hero-grid">
+          <div class="hero-left">
+            <h1 class="hero-title">NetWatch E6</h1>
+            <p class="hero-subtitle">
+              Monitoramento de redes Wi-Fi, diagnóstico de falhas e defesa automática em um smartphone comum, sem root.
+            </p>
+            <div class="hero-pillars">
+              <span>100% Autônomo</span>
+              <span class="dot">•</span>
+              <span>Sem Root</span>
+              <span class="dot">•</span>
+              <span>Operação Local</span>
+            </div>
+          </div>
+
+          <div class="hero-right">
+            <div class="summary-label">Resumo do Dispositivo</div>
+            <div class="summary-list">
+              <div class="summary-item">
+                <div class="summary-item-title">Motorola Moto E6 Play (Android 9)</div>
+                <div class="summary-item-desc">Sistema original de fábrica preservado, sem desbloqueio ou modificações invasivas.</div>
+              </div>
+              <div class="summary-item">
+                <div class="summary-item-title">Varredura completa em ~3,6s</div>
+                <div class="summary-item-desc">Mapeamento rápido de todos os equipamentos conectados na rede local.</div>
+              </div>
+              <div class="summary-item">
+                <div class="summary-item-title">5 sensores automáticos de defesa</div>
+                <div class="summary-item-desc">Vigilância contínua contra adulteração de roteador, desvios de DNS e intrusos.</div>
+              </div>
+              <div class="summary-item">
+                <div class="summary-item-title">Operado direto na tela do aparelho</div>
+                <div class="summary-item-desc">Interface fluida pensada para uso imediato em campo, sem depender de computador.</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Slide 2 — O Problema e a Proposta -->
+      <section class="slide" data-index="1">
+        <div class="slide-header">
+          <h2 class="slide-title">O Problema e a Proposta</h2>
+          <p class="slide-lead">Visibilidade imediata da rede local sem infraestrutura dedicada e sem comprometer a segurança do aparelho.</p>
+        </div>
+
+        <div class="two-col">
+          <div class="col-card">
+            <div>
+              <div class="col-tag neutral">O Cenário Atual</div>
+              <h3 class="col-heading">Ferramentas tradicionais exigem equipamentos caros ou modificações de risco</h3>
+              <p class="col-body">
+                Monitorar redes locais normalmente exige notebooks, softwares complexos, acesso administrativo ao roteador ou celulares modificados com root — o que aumenta o custo operacional, expõe o dispositivo a falhas de segurança e dificulta o diagnóstico rápido no local.
+              </p>
+            </div>
+          </div>
+
+          <div class="col-card">
+            <div>
+              <div class="col-tag">A Solução NetWatch E6</div>
+              <h3 class="col-heading">Um smartphone comum transformado em monitor portátil independente</h3>
+              <p class="col-body">
+                O NetWatch E6 transforma um smartphone comum e travado de fábrica, com a segurança original do Android preservada, em uma estação autônoma de monitoramento. Basta conectar no Wi-Fi para ele mapear dispositivos, diagnosticar falhas e vigiar a rede sozinho.
+              </p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Slide 3 — Posicionamento na Rede (Topologia estilo Packet Tracer) -->
+      <section class="slide" data-index="2">
+        <div class="slide-header" style="margin-bottom: 24px;">
+          <h2 class="slide-title">Como o NetWatch E6 atua na rede doméstica</h2>
+          <p class="slide-lead">Conectado ao Wi-Fi como um aparelho comum, sem interceptar o tráfego de terceiros e sem alterar o roteador.</p>
+        </div>
+
+        <div class="topology-layout">
+          <div class="topology-stage">
+            <div class="topology-svg-wrap">
+              <svg class="topology-svg" viewBox="0 0 880 370" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <!-- Linhas base físicas/Wi-Fi estáticas -->
+                <g stroke="#262A34" stroke-width="2">
+                  <!-- Internet <-> Roteador -->
+                  <line x1="210" y1="185" x2="365" y2="185" />
+                  <!-- Roteador <-> Notebook -->
+                  <line x1="495" y1="155" x2="670" y2="68" />
+                  <!-- Roteador <-> Smart TV -->
+                  <line x1="495" y1="185" x2="670" y2="185" />
+                  <!-- Roteador <-> Celular Confiável -->
+                  <line x1="495" y1="215" x2="670" y2="302" />
+                  <!-- Roteador <-> NetWatch E6 -->
+                  <line x1="430" y1="235" x2="430" y2="292" />
+                </g>
+
+                <!-- MODO 1: Descoberta e Portas (NetWatch E6 -> Roteador -> Hosts) -->
+                <g id="topoMode1" class="topo-group visible">
+                  <path d="M 430 292 L 430 235" stroke="#3B82F6" stroke-width="2.5" class="flow-line" />
+                  <path d="M 495 155 L 670 68" stroke="#3B82F6" stroke-width="2.5" class="flow-line" />
+                  <path d="M 495 185 L 670 185" stroke="#3B82F6" stroke-width="2.5" class="flow-line" />
+                  <path d="M 495 215 L 670 302" stroke="#3B82F6" stroke-width="2.5" class="flow-line" />
+                  <circle cx="670" cy="68" r="4.5" fill="#3B82F6" />
+                  <circle cx="670" cy="185" r="4.5" fill="#3B82F6" />
+                  <circle cx="670" cy="302" r="4.5" fill="#3B82F6" />
+                </g>
+
+                <!-- MODO 2: Diagnóstico Externo (NetWatch E6 -> Roteador -> Internet) -->
+                <g id="topoMode2" class="topo-group">
+                  <path d="M 430 292 L 430 235" stroke="#3B82F6" stroke-width="2.8" class="flow-line" />
+                  <path d="M 365 185 L 210 185" stroke="#3B82F6" stroke-width="2.8" class="flow-line" />
+                  <circle cx="210" cy="185" r="5" fill="#3B82F6" />
+                  <circle cx="365" cy="185" r="5" fill="#3B82F6" />
+                </g>
+
+                <!-- MODO 3: Isolamento e Privacidade (Hosts -> Roteador -> Internet direto, sem passar pelo E6) -->
+                <g id="topoMode3" class="topo-group">
+                  <path d="M 670 68 L 495 155" stroke="#A1A7B3" stroke-width="2.5" class="flow-line" />
+                  <path d="M 670 185 L 495 185" stroke="#A1A7B3" stroke-width="2.5" class="flow-line" />
+                  <path d="M 670 302 L 495 215" stroke="#A1A7B3" stroke-width="2.5" class="flow-line" />
+                  <path d="M 365 185 L 210 185" stroke="#A1A7B3" stroke-width="2.5" class="flow-line" />
+                  <!-- Indicador visual de isolamento no NetWatch E6 -->
+                  <rect x="312" y="286" width="236" height="74" rx="14" stroke="#10B981" stroke-width="1.5" stroke-dasharray="5 5" />
+                </g>
+
+                <!-- NÓ: INTERNET (Nuvem) -->
+                <g transform="translate(50, 135)">
+                  <rect x="0" y="0" width="160" height="100" rx="14" fill="#0F1115" stroke="#262A34" stroke-width="1.8" />
+                  <!-- Ícone Nuvem / Globo limpo -->
+                  <path d="M68 48 C62 48 58 43 58 38 C58 33 62 29 67 29 C69 22 76 18 83 18 C92 18 98 25 99 33 C103 34 106 38 106 42 C106 46 102 48 98 48 Z" stroke="#A1A7B3" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" fill="none" />
+                  <text x="80" y="72" text-anchor="middle" fill="#F5F7FA" font-size="15" font-weight="600" font-family="Inter, sans-serif">Internet (WAN)</text>
+                  <text x="80" y="90" text-anchor="middle" fill="#A1A7B3" font-size="12" font-family="Inter, sans-serif">DNS e Saída Externa</text>
+                </g>
+
+                <!-- NÓ: ROTEADOR WI-FI (Centro) -->
+                <g transform="translate(365, 135)">
+                  <rect x="0" y="0" width="130" height="100" rx="14" fill="#0F1115" stroke="#262A34" stroke-width="1.8" />
+                  <!-- Ícone Roteador -->
+                  <rect x="42" y="34" width="46" height="16" rx="4" stroke="#F5F7FA" stroke-width="1.8" />
+                  <line x1="50" y1="34" x2="46" y2="20" stroke="#F5F7FA" stroke-width="1.8" stroke-linecap="round" />
+                  <line x1="80" y1="34" x2="84" y2="20" stroke="#F5F7FA" stroke-width="1.8" stroke-linecap="round" />
+                  <circle cx="52" cy="42" r="2" fill="#10B981" />
+                  <circle cx="60" cy="42" r="2" fill="#3B82F6" />
+                  <text x="65" y="72" text-anchor="middle" fill="#F5F7FA" font-size="15" font-weight="600" font-family="Inter, sans-serif">Roteador Wi-Fi</text>
+                  <text x="65" y="90" text-anchor="middle" fill="#A1A7B3" font-size="12" font-family="Inter, sans-serif">Ponto Central</text>
+                </g>
+
+                <!-- NÓ: NETWATCH E6 (Abaixo do Roteador, borda azul sutil) -->
+                <g transform="translate(318, 292)">
+                  <rect x="0" y="0" width="224" height="62" rx="12" fill="#0F1115" stroke="#3B82F6" stroke-width="2" />
+                  <!-- Ícone Smartphone E6 -->
+                  <rect x="18" y="13" width="22" height="36" rx="4" stroke="#3B82F6" stroke-width="1.8" />
+                  <circle cx="29" cy="44" r="1.5" fill="#3B82F6" />
+                  <text x="54" y="28" fill="#F5F7FA" font-size="15" font-weight="600" font-family="Inter, sans-serif">NetWatch E6</text>
+                  <text x="54" y="46" fill="#A1A7B3" font-size="12.5" font-family="Inter, sans-serif">Moto E6 Play • Sem Root</text>
+                </g>
+
+                <!-- NÓ: NOTEBOOK (Direita Topo) -->
+                <g transform="translate(670, 26)">
+                  <rect x="0" y="0" width="175" height="82" rx="12" fill="#0F1115" stroke="#262A34" stroke-width="1.6" />
+                  <!-- Ícone Notebook -->
+                  <rect x="18" y="22" width="28" height="18" rx="2" stroke="#A1A7B3" stroke-width="1.7" />
+                  <line x1="14" y1="43" x2="50" y2="43" stroke="#A1A7B3" stroke-width="1.7" stroke-linecap="round" />
+                  <text x="60" y="38" fill="#F5F7FA" font-size="15" font-weight="600" font-family="Inter, sans-serif">Notebook</text>
+                  <text x="60" y="56" fill="#A1A7B3" font-size="12" font-family="Inter, sans-serif">Confiável</text>
+                </g>
+
+                <!-- NÓ: SMART TV (Direita Meio) -->
+                <g transform="translate(670, 144)">
+                  <rect x="0" y="0" width="175" height="82" rx="12" fill="#0F1115" stroke="#262A34" stroke-width="1.6" />
+                  <!-- Ícone Smart TV -->
+                  <rect x="18" y="20" width="28" height="20" rx="2" stroke="#A1A7B3" stroke-width="1.7" />
+                  <line x1="26" y1="44" x2="38" y2="44" stroke="#A1A7B3" stroke-width="1.7" stroke-linecap="round" />
+                  <text x="60" y="38" fill="#F5F7FA" font-size="15" font-weight="600" font-family="Inter, sans-serif">Smart TV</text>
+                  <text x="60" y="56" fill="#A1A7B3" font-size="12" font-family="Inter, sans-serif">Confiável</text>
+                </g>
+
+                <!-- NÓ: CELULAR CONFIÁVEL (Direita Base) -->
+                <g transform="translate(670, 262)">
+                  <rect x="0" y="0" width="175" height="82" rx="12" fill="#0F1115" stroke="#262A34" stroke-width="1.6" />
+                  <!-- Ícone Celular -->
+                  <rect x="24" y="18" width="18" height="30" rx="3" stroke="#A1A7B3" stroke-width="1.7" />
+                  <circle cx="33" cy="43" r="1.3" fill="#A1A7B3" />
+                  <text x="60" y="38" fill="#F5F7FA" font-size="15" font-weight="600" font-family="Inter, sans-serif">Celular</text>
+                  <text x="60" y="56" fill="#A1A7B3" font-size="12" font-family="Inter, sans-serif">Confiável</text>
+                </g>
+              </svg>
+            </div>
+
+            <div class="topo-mode-bar">
+              <div class="topo-mode-buttons" id="topoModeBtns">
+                <button class="topo-mode-btn active" type="button" data-mode="1">1. Descoberta e Portas</button>
+                <button class="topo-mode-btn" type="button" data-mode="2">2. Diagnóstico Externo</button>
+                <button class="topo-mode-btn" type="button" data-mode="3">3. Isolamento e Privacidade</button>
+              </div>
+              <div class="topo-mode-caption" id="topoModeCaption">
+                Sondas rápidas de presença e portas enviadas pelo roteador até os aparelhos.
+              </div>
+            </div>
+          </div>
+
+          <div class="topology-side">
+            <div class="topo-side-item">
+              <div class="topo-side-title">Sem configuração no roteador</div>
+              <div class="topo-side-desc">Basta conectar no Wi-Fi como qualquer celular comum para começar a mapear a rede automaticamente.</div>
+            </div>
+            <div class="topo-side-item">
+              <div class="topo-side-title">Posicionamento lateral (passivo e autorizado)</div>
+              <div class="topo-side-desc">Não fica no meio da conexão da casa e nunca derruba a internet se o aparelho desligar ou sair do alcance.</div>
+            </div>
+            <div class="topo-side-item">
+              <div class="topo-side-title">Acesso isolado</div>
+              <div class="topo-side-desc">O painel roda apenas na tela do próprio E6 (127.0.0.1), permanecendo invisível para os outros aparelhos da casa.</div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Slide 4 — Como o Aplicativo Funciona na Prática (5 Telas do App) -->
+      <section class="slide" data-index="3">
+        <div class="slide-header">
+          <h2 class="slide-title">Como o Aplicativo Funciona na Prática</h2>
+          <p class="slide-lead">Cinco áreas integradas para diagnóstico, inventário, defesa ativa e geração de relatórios diretamente no celular.</p>
+        </div>
+
+        <div class="tabs-layout">
+          <div class="tab-buttons" id="appTabs">
+            <button class="tab-btn active" type="button" data-tab="0">
+              <span class="tab-btn-name">Visão Geral</span>
+              <span class="tab-btn-num">01</span>
+            </button>
+            <button class="tab-btn" type="button" data-tab="1">
+              <span class="tab-btn-name">Dispositivos</span>
+              <span class="tab-btn-num">02</span>
+            </button>
+            <button class="tab-btn" type="button" data-tab="2">
+              <span class="tab-btn-name">Serviços</span>
+              <span class="tab-btn-num">03</span>
+            </button>
+            <button class="tab-btn" type="button" data-tab="3">
+              <span class="tab-btn-name">Defesa</span>
+              <span class="tab-btn-num">04</span>
+            </button>
+            <button class="tab-btn" type="button" data-tab="4">
+              <span class="tab-btn-name">Relatórios</span>
+              <span class="tab-btn-num">05</span>
+            </button>
+          </div>
+
+          <div class="tab-panel" id="tabPanel">
+            <div>
+              <div class="tab-panel-label" id="tabLabel">Tela 01 de 05</div>
+              <h3 class="tab-panel-title" id="tabTitle">Visão Geral</h3>
+              <p class="tab-panel-desc" id="tabDesc">
+                Mostra em segundos se a rede está operacional ou exatamente onde está a falha — no roteador local, na saída para a internet ou na resolução de nomes DNS — acompanhando a latência de cada etapa.
+              </p>
+            </div>
+            <div class="tab-highlights" id="tabHighlights">
+              <div class="tab-highlight-item">
+                <div class="tab-highlight-title">Diagnóstico por etapa</div>
+                <div class="tab-highlight-text">Separa claramente problemas internos do Wi-Fi de quedas externas da operadora.</div>
+              </div>
+              <div class="tab-highlight-item">
+                <div class="tab-highlight-title">Leitura instantânea</div>
+                <div class="tab-highlight-text">Exibe velocidade de resposta, consumo do próprio aparelho e resumo dos equipamentos ativos.</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Slide 5 — Descoberta Rápida e Inteligente -->
+      <section class="slide" data-index="4">
+        <div class="slide-header">
+          <h2 class="slide-title">Descoberta Rápida e Inteligente</h2>
+          <p class="slide-lead">Varredura em duas etapas para detectar entradas e saídas quase em tempo real sem sobrecarregar a rede.</p>
+        </div>
+
+        <div class="metrics-row">
+          <div class="metric-card">
+            <div class="metric-value">~0,8s</div>
+            <div class="metric-caption">Verificação de aparelhos já conhecidos</div>
+          </div>
+          <div class="metric-card">
+            <div class="metric-value">~3,6s</div>
+            <div class="metric-caption">Varredura completa da rede local</div>
+          </div>
+          <div class="metric-card">
+            <div class="metric-value">16 portas</div>
+            <div class="metric-caption">Serviços auditados por equipamento</div>
+          </div>
+        </div>
+
+        <div class="two-col">
+          <div class="card">
+            <h3 class="card-title">Encontra aparelhos que bloqueiam ping</h3>
+            <p class="card-text">
+              Combina testes rápidos de conexão TCP, consultas UDP e a tabela interna de rede do sistema para detectar celulares modernos e computadores mesmo quando o firewall bloqueia respostas tradicionais.
+            </p>
+          </div>
+          <div class="card">
+            <h3 class="card-title">Identificação precisa</h3>
+            <p class="card-text">
+              Cruza o fabricante do endereço MAC com a resposta real dos serviços abertos na rede, garantindo identificação confiável de roteadores, servidores e terminais mesmo quando há uso de MAC aleatório.
+            </p>
+          </div>
+        </div>
+      </section>
+
+      <!-- Slide 6 — Proteção de Escopo em Redes Grandes -->
+      <section class="slide" data-index="5">
+        <div class="slide-header" style="margin-bottom: 24px;">
+          <h2 class="slide-title">Proteção de Escopo em Redes Grandes</h2>
+          <p class="slide-lead">Como o NetWatch E6 evita travamentos quando conectado a redes corporativas ou públicas com milhares de dispositivos.</p>
+        </div>
+
+        <div class="two-col">
+          <div class="col-card" style="padding: 32px 36px;">
+            <div>
+              <div class="col-tag neutral">O Risco (Redes /22, /20 ou /16)</div>
+              <h3 class="col-heading" style="font-size: clamp(22px, 1.7vw, 27px); margin-bottom: 16px;">Faixas extensas podem conter até 65.534 endereços IP</h3>
+              <ul class="clean-list neutral-list">
+                <li>Em redes grandes — como empresas, shoppings ou universidades — uma única faixa pode abranger até <strong>65.534 endereços IP</strong> (/16).</li>
+                <li>Tentar varrer todos os endereços de uma só vez em um smartphone comum causaria demora excessiva, alto consumo de bateria e travamento por falta de memória.</li>
+              </ul>
+            </div>
+          </div>
+
+          <div class="col-card" style="padding: 32px 36px;">
+            <div>
+              <div class="col-tag">A Solução (Teto Automático /24)</div>
+              <h3 class="col-heading" style="font-size: clamp(22px, 1.7vw, 27px); margin-bottom: 16px;">Limite inteligente para o bloco local de 254 endereços</h3>
+              <ul class="clean-list">
+                <li>O sistema identifica automaticamente quando a rede é maior que /24 e aplica um <strong>limite de escopo</strong> imediato.</li>
+                <li>Em vez de varrer dezenas de milhares de IPs, ele recorta a varredura apenas para o <strong>bloco local de 254 endereços</strong> onde o aparelho está conectado.</li>
+                <li><strong>Resultado:</strong> o ciclo continua previsível (<strong>~3,6 segundos</strong>), com uso estável de memória e bateria.</li>
+              </ul>
+            </div>
+          </div>
+        </div>
+
+        <div class="scope-flow-bar">
+          <div class="scope-step">
+            <span class="scope-step-label">1. Rede detectada</span>
+            <span class="scope-step-value">10.0.0.0/16</span>
+            <span class="scope-step-sub">65.534 endereços possíveis</span>
+          </div>
+
+          <div class="scope-arrow">→</div>
+
+          <div class="scope-step">
+            <span class="scope-step-label">2. IP do NetWatch E6</span>
+            <span class="scope-step-value">10.0.15.42</span>
+            <span class="scope-step-sub">Segmento ativo identificado</span>
+          </div>
+
+          <div class="scope-arrow">→</div>
+
+          <div class="scope-step">
+            <span class="scope-step-label accent">3. Recorte automático aplicado</span>
+            <span class="scope-step-value">10.0.15.1 até 10.0.15.254</span>
+            <span class="scope-step-sub">Varre apenas 254 IPs em ~3,6s</span>
+          </div>
+        </div>
+      </section>
+
+      <!-- Slide 7 — Defesa Automática em Tempo Real (MITRE ATT&CK) -->
+      <section class="slide" data-index="6">
+        <div class="slide-header" style="margin-bottom: 22px;">
+          <h2 class="slide-title">Defesa Automática em Tempo Real</h2>
+          <p class="slide-lead">Cinco sensores contínuos mapeados à matriz MITRE ATT&CK para detectar ataques e alterações na rede local.</p>
+        </div>
+
+        <div class="sensors-top-row">
+          <div class="sensor-card">
+            <div>
+              <div class="sensor-header">
+                <h3 class="sensor-title">Proteção contra invasão de roteador</h3>
+                <span class="mitre-code">T1557.002</span>
+              </div>
+              <p class="sensor-desc">
+                Detecta troca suspeita do endereço físico do roteador ou aparelhos tentando se passar pelo ponto central da rede.
+              </p>
+            </div>
+          </div>
+
+          <div class="sensor-card">
+            <div>
+              <div class="sensor-header">
+                <h3 class="sensor-title">Integridade de DNS</h3>
+                <span class="mitre-code">T1557</span>
+              </div>
+              <p class="sensor-desc">
+                Identifica redirecionamento malicioso de endereços, validando o certificado real do site para evitar falsos alarmes.
+              </p>
+            </div>
+          </div>
+
+          <div class="sensor-card">
+            <div>
+              <div class="sensor-header">
+                <h3 class="sensor-title">Portas críticas e alterações</h3>
+                <span class="mitre-code">T1021 / T1046</span>
+              </div>
+              <p class="sensor-desc">
+                Avisa sobre portas perigosas expostas na rede ou qualquer nova porta aberta de repente em um equipamento conhecido.
+              </p>
+            </div>
+          </div>
+        </div>
+
+        <div class="sensors-bottom-row">
+          <div class="sensor-card">
+            <div>
+              <div class="sensor-header">
+                <h3 class="sensor-title">Trava de rede confiável</h3>
+                <span class="mitre-code">T1200</span>
+              </div>
+              <p class="sensor-desc">
+                Fixa a lista de aparelhos autorizados com um toque e alerta imediatamente se qualquer dispositivo desconhecido entrar no Wi-Fi.
+              </p>
+            </div>
+          </div>
+
+          <div class="sensor-card">
+            <div>
+              <div class="sensor-header">
+                <h3 class="sensor-title">Validade de certificados</h3>
+                <span class="mitre-code">T1557</span>
+              </div>
+              <p class="sensor-desc">
+                Monitora serviços HTTPS ativos e avisa antecipadamente sobre certificados vencidos ou próximos do vencimento.
+              </p>
+            </div>
+          </div>
+        </div>
+
+        <div class="demo-bar">
+          <div class="demo-status-group">
+            <div class="status-indicator" id="socStatusBadge">
+              <span class="status-dot"></span>
+              <span id="socStatusText">Estado: Seguro</span>
+            </div>
+            <div class="demo-message" id="socDemoMessage">
+              Rede confiável travada. Todos os aparelhos conectados estão autorizados.
+            </div>
+          </div>
+
+          <div class="demo-actions">
+            <button class="btn-action" type="button" id="btnSimulateIntruder">Demonstrar alerta de invasor</button>
+          </div>
+        </div>
+      </section>
+
+      <!-- Slide 8 — Segurança, Autonomia e Limites Transparentes -->
+      <section class="slide" data-index="7">
+        <div class="slide-header">
+          <h2 class="slide-title">Segurança, Autonomia e Limites Transparentes</h2>
+          <p class="slide-lead">Operação isolada no próprio aparelho com clareza total sobre o alcance do monitoramento sem root.</p>
+        </div>
+
+        <div class="two-col">
+          <div class="col-card">
+            <div>
+              <div class="col-tag">Segurança e Autonomia</div>
+              <h3 class="col-heading">Isolamento total e funcionamento contínuo</h3>
+              <ul class="clean-list">
+                <li><strong>100% local e sem nuvem:</strong> todos os dados e relatórios permanecem gravados apenas no próprio aparelho.</li>
+                <li><strong>Painel invisível para a rede:</strong> o sistema aceita acesso somente da própria tela do celular; ninguém no mesmo Wi-Fi consegue abrir o painel.</li>
+                <li><strong>Proteção fora do Wi-Fi:</strong> pausa automaticamente as varreduras se o Wi-Fi cair, evitando tráfego na rede da operadora móvel.</li>
+                <li><strong>Autonomia total:</strong> inicia sozinho ao ligar o smartphone e continua monitorando mesmo com a tela apagada.</li>
+              </ul>
+            </div>
+          </div>
+
+          <div class="col-card">
+            <div>
+              <div class="col-tag neutral">Limites do Modo Sem Root</div>
+              <h3 class="col-heading">Transparência técnica e foco defensivo</h3>
+              <ul class="clean-list neutral-list">
+                <li><strong>Medição de consumo local:</strong> mede o volume de tráfego real apenas do próprio aparelho, pois o tráfego dos demais equipamentos vai direto ao roteador.</li>
+                <li><strong>Sem interceptação de terceiros:</strong> não captura pacotes nem espiona o conteúdo navegado por outros usuários da rede.</li>
+                <li><strong>Sem bloqueio ou derrubada:</strong> não interrompe conexões alheias e não altera regras do sistema — foco estritamente em diagnóstico autorizado e detecção defensiva.</li>
+              </ul>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Slide 9 — Encerramento -->
+      <section class="slide" data-index="8">
+        <div class="closing-wrap">
+          <h2 class="closing-statement">
+            NetWatch E6 — Visibilidade, diagnóstico e defesa de rede na palma da mão, sem root e sem depender de computador.
+          </h2>
+
+          <div class="closing-pillars">
+            <div class="closing-pillar-card">
+              <div class="closing-pillar-title">Portátil</div>
+              <div class="closing-pillar-desc">Pronto para diagnóstico imediato em qualquer ambiente Wi-Fi apenas com o smartphone.</div>
+            </div>
+            <div class="closing-pillar-card">
+              <div class="closing-pillar-title">Autônomo</div>
+              <div class="closing-pillar-desc">Inicia sozinho, vigia a rede em segundo plano e alerta anomalias sem intervenção manual.</div>
+            </div>
+            <div class="closing-pillar-card">
+              <div class="closing-pillar-title">Auditável</div>
+              <div class="closing-pillar-desc">Histórico claro de eventos, alertas mapeados ao MITRE ATT&CK e exportação imediata de relatórios.</div>
+            </div>
+          </div>
+
+          <div class="closing-ready">
+            <span class="closing-ready-dot"></span>
+            <span>Sistema em execução e pronto para demonstração ao vivo no aparelho.</span>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <footer class="bottombar">
+      <button class="nav-arrow" type="button" id="prevBtn" aria-label="Slide anterior">←</button>
+      <button class="nav-arrow" type="button" id="nextBtn" aria-label="Próximo slide">→</button>
+    </footer>
+  </div>
+
+  <script>
+    (function () {
+      const slides = Array.from(document.querySelectorAll('.slide'));
+      const totalSlides = slides.length;
+      const counterEl = document.getElementById('slideCounter');
+      const prevBtn = document.getElementById('prevBtn');
+      const nextBtn = document.getElementById('nextBtn');
+      let currentSlide = 0;
+
+      function updateSlide(index) {
+        if (index < 0 || index >= totalSlides) return;
+        currentSlide = index;
+        slides.forEach((slide, i) => {
+          slide.classList.toggle('active', i === currentSlide);
+        });
+        counterEl.textContent = (currentSlide + 1) + ' / ' + totalSlides;
+        prevBtn.disabled = currentSlide === 0;
+        nextBtn.disabled = currentSlide === totalSlides - 1;
+      }
+
+      prevBtn.addEventListener('click', () => updateSlide(currentSlide - 1));
+      nextBtn.addEventListener('click', () => updateSlide(currentSlide + 1));
+
+      document.addEventListener('keydown', (e) => {
+        if (e.key === 'ArrowRight' || e.key === 'PageDown' || e.key === ' ') {
+          e.preventDefault();
+          updateSlide(currentSlide + 1);
+        } else if (e.key === 'ArrowLeft' || e.key === 'PageUp') {
+          e.preventDefault();
+          updateSlide(currentSlide - 1);
+        } else if (e.key === 'f' || e.key === 'F') {
+          e.preventDefault();
+          if (!document.fullscreenElement) {
+            document.documentElement.requestFullscreen().catch(() => {});
+          } else {
+            document.exitFullscreen().catch(() => {});
+          }
+        }
+      });
+
+      // Slide 3: Interação das 5 telas do aplicativo
+      const appScreens = [
+        {
+          label: 'Tela 01 de 05',
+          title: 'Visão Geral',
+          desc: 'Mostra em segundos se a rede está operacional ou exatamente onde está a falha — no roteador local, na saída para a internet ou na resolução de nomes DNS — acompanhando a latência de cada etapa.',
+          h1Title: 'Diagnóstico por etapa',
+          h1Text: 'Separa claramente problemas internos do Wi-Fi de quedas externas da operadora.',
+          h2Title: 'Leitura instantânea',
+          h2Text: 'Exibe velocidade de resposta, consumo do próprio aparelho e resumo dos equipamentos ativos.'
+        },
+        {
+          label: 'Tela 02 de 05',
+          title: 'Dispositivos',
+          desc: 'Lista todos os equipamentos conectados, avisa na hora quem acabou de entrar ou sair do Wi-Fi, identifica fabricantes e abre o relatório individual completo de cada aparelho.',
+          h1Title: 'Movimentação em tempo real',
+          h1Text: 'Destaca entradas e desconexões recentes com tempo de sessão e histórico de estabilidade.',
+          h2Title: 'Ficha individual por aparelho',
+          h2Text: 'Reúne tipo de equipamento, serviços abertos, latência recente e opção de marcar como confiável.'
+        },
+        {
+          label: 'Tela 03 de 05',
+          title: 'Serviços',
+          desc: 'Testa continuamente se os serviços essenciais — DNS, SSH, HTTP e HTTPS — estão realmente respondendo de forma saudável, não apenas com a porta aberta.',
+          h1Title: 'Verificação funcional',
+          h1Text: 'Confirma se o serviço entrega resposta válida e mede o tempo exato de retorno.',
+          h2Title: 'Detecção de degradação',
+          h2Text: 'Aponta lentidão ou falhas silenciosas antes que os usuários percebam queda total.'
+        },
+        {
+          label: 'Tela 04 de 05',
+          title: 'Defesa (SOC)',
+          desc: 'Exibe o nível de risco atual da rede (Seguro, Atenção ou Crítico), concentra os alertas ativos mapeados ao MITRE ATT&CK e permite travar a lista de aparelhos confiáveis com um toque.',
+          h1Title: 'Trava de rede confiável',
+          h1Text: 'Qualquer equipamento novo fora da lista autorizada gera alerta imediato para revisão.',
+          h2Title: 'Proteção contra adulterações',
+          h2Text: 'Monitora integridade do roteador, respostas DNS, abertura de portas e validade de certificados.'
+        },
+        {
+          label: 'Tela 05 de 05',
+          title: 'Relatórios',
+          desc: 'Mantém a linha do tempo completa de eventos da rede e permite exportar o diagnóstico geral ou individual em Markdown ou JSON pronto para auditoria.',
+          h1Title: 'Histórico organizado',
+          h1Text: 'Registra mudanças de estado, entradas de equipamentos e alertas de segurança com data e hora.',
+          h2Title: 'Exportação com um toque',
+          h2Text: 'Gera arquivos limpos e estruturados diretamente no aparelho para documentação técnica.'
+        }
+      ];
+
+      const tabButtons = Array.from(document.querySelectorAll('#appTabs .tab-btn'));
+      const tabLabel = document.getElementById('tabLabel');
+      const tabTitle = document.getElementById('tabTitle');
+      const tabDesc = document.getElementById('tabDesc');
+      const tabHighlights = document.getElementById('tabHighlights');
+
+      tabButtons.forEach((btn) => {
+        btn.addEventListener('click', () => {
+          const idx = parseInt(btn.getAttribute('data-tab'), 10);
+          const data = appScreens[idx];
+          if (!data) return;
+
+          tabButtons.forEach((b) => b.classList.remove('active'));
+          btn.classList.add('active');
+
+          tabLabel.textContent = data.label;
+          tabTitle.textContent = data.title;
+          tabDesc.textContent = data.desc;
+          tabHighlights.innerHTML =
+            '<div class="tab-highlight-item">' +
+              '<div class="tab-highlight-title">' + data.h1Title + '</div>' +
+              '<div class="tab-highlight-text">' + data.h1Text + '</div>' +
+            '</div>' +
+            '<div class="tab-highlight-item">' +
+              '<div class="tab-highlight-title">' + data.h2Title + '</div>' +
+              '<div class="tab-highlight-text">' + data.h2Text + '</div>' +
+            '</div>';
+        });
+      });
+
+      // Slide 5: Demonstração discreta de alerta de invasor (T1200)
+      const socBadge = document.getElementById('socStatusBadge');
+      const socText = document.getElementById('socStatusText');
+      const socMsg = document.getElementById('socDemoMessage');
+      const btnSim = document.getElementById('btnSimulateIntruder');
+      let alertActive = false;
+
+      btnSim.addEventListener('click', () => {
+        if (!alertActive) {
+          alertActive = true;
+          socBadge.classList.add('warning');
+          socText.textContent = 'Estado: Atenção';
+          socMsg.innerHTML = 'Alerta T1200: Novo dispositivo não autorizado conectado à rede travada.';
+          btnSim.textContent = 'Confirmar leitura';
+        } else {
+          alertActive = false;
+          socBadge.classList.remove('warning');
+          socText.textContent = 'Estado: Seguro';
+          socMsg.textContent = 'Leitura confirmada. Rede monitorada e sob controle.';
+          btnSim.textContent = 'Demonstrar alerta de invasor';
+        }
+      });
+
+      // Slide 3: Modos interativos do diagrama de topologia
+      const topoBtns = Array.from(document.querySelectorAll('#topoModeBtns .topo-mode-btn'));
+      const topoCaption = document.getElementById('topoModeCaption');
+      const topoGroups = {
+        1: document.getElementById('topoMode1'),
+        2: document.getElementById('topoMode2'),
+        3: document.getElementById('topoMode3')
+      };
+      const topoCaptions = {
+        1: 'Sondas rápidas de presença e portas enviadas pelo roteador até os aparelhos.',
+        2: 'Teste direto da saúde do roteador, saída para a internet e integridade de DNS.',
+        3: 'O tráfego dos moradores vai direto ao roteador; o NetWatch E6 não intercepta terceiros.'
+      };
+
+      topoBtns.forEach((btn) => {
+        btn.addEventListener('click', () => {
+          const mode = btn.getAttribute('data-mode');
+          topoBtns.forEach((b) => b.classList.remove('active'));
+          btn.classList.add('active');
+          Object.keys(topoGroups).forEach((k) => {
+            topoGroups[k].classList.toggle('visible', k === mode);
+          });
+          topoCaption.textContent = topoCaptions[mode] || '';
+        });
+      });
+
+      updateSlide(0);
+    })();
+  </script>
+</body>
+</html>

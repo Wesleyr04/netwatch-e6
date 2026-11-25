@@ -1,0 +1,23 @@
+# Python / Flask
+__pycache__/
+*.py[cod]
+*$py.class
+.venv/
+venv/
+env/
+
+# Banco de dados local e logs
+*.db
+*.db-shm
+*.db-wal
+*.log
+
+# Binários pesados locais (APKs e túneis temporários)
+apk/*.apk
+cloudflared.exe
+
+# Sistema operacional / IDE
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/

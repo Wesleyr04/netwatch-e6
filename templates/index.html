@@ -1,0 +1,465 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="theme-color" content="#0b1120">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="NetWatch E6">
+    <title>NetWatch E6 — Monitor &amp; SOC</title>
+    <link rel="manifest" href="/static/manifest.json">
+    <link rel="icon" type="image/svg+xml" href="/static/icon.svg">
+    <link rel="apple-touch-icon" href="/static/icon.svg">
+    <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+    <header class="navbar">
+        <div class="nav-brand">
+            <img src="/static/icon.svg" alt="NetWatch" class="brand-logo" width="32" height="32">
+            <div class="brand-text">
+                <h1>NetWatch E6</h1>
+                <span class="sub-badge">Moto E6 Play &bull; SOC Automático</span>
+            </div>
+        </div>
+        <div class="nav-status">
+            <span id="global-badge" class="badge badge-pending">Conectando...</span>
+            <button id="btn-refresh-all" class="btn btn-icon" title="Atualizar dados">&#x21bb;</button>
+        </div>
+    </header>
+
+    <main class="container">
+        <!-- Barra de Navegação por Abas -->
+        <nav class="tabs">
+            <button class="tab-btn active" data-tab="tab-overview">Visão Geral</button>
+            <button class="tab-btn" data-tab="tab-devices">Dispositivos (<span id="dev-count">0</span>)</button>
+            <button class="tab-btn" data-tab="tab-soc">
+                &#x1F6E1; SOC <span id="soc-tab-badge" class="soc-nav-badge hidden">0</span>
+            </button>
+            <button class="tab-btn" data-tab="tab-services">Serviços (<span id="srv-count">0</span>)</button>
+            <button class="tab-btn" data-tab="tab-reports">Relatórios &amp; Eventos</button>
+        </nav>
+
+        <!-- ABA 1: VISÃO GERAL -->
+        <section id="tab-overview" class="tab-content active">
+            <!-- Banner de aviso Plug-and-Play Wi-Fi (exibido quando is_connected == False) -->
+            <div id="wifi-warning-banner" class="wifi-warning-banner hidden">
+                <div class="wifi-warning-icon">&#x26A0;&#xFE0F;</div>
+                <div class="wifi-warning-body">
+                    <strong>Modo de Proteção Plug-and-Play Wi-Fi Ativo</strong>
+                    <p id="wifi-warning-text">Conecte o aparelho a uma rede Wi-Fi para iniciar o monitoramento</p>
+                </div>
+            </div>
+
+            <div class="cards-grid">
+                <div class="card status-card">
+                    <h3>Estado da Conexão</h3>
+                    <div class="status-indicator">
+                        <span id="conn-pill" class="pill pill-unknown">AGUARDANDO</span>
+                        <p id="conn-details" class="text-muted">Analisando conectividade...</p>
+                    </div>
+                    <div class="latency-row">
+                        <div class="lat-box">
+                            <span class="lat-label">Gateway</span>
+                            <span id="lat-gw" class="lat-val">-- ms</span>
+                        </div>
+                        <div class="lat-box">
+                            <span class="lat-label">WAN (1.1.1.1)</span>
+                            <span id="lat-wan" class="lat-val">-- ms</span>
+                        </div>
+                        <div class="lat-box">
+                            <span class="lat-label">DNS (Google)</span>
+                            <span id="lat-dns" class="lat-val">-- ms</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="card info-card">
+                    <h3>Interface &amp; Rede Local</h3>
+                    <ul class="info-list">
+                        <li><span>Interface:</span> <strong id="net-iface">--</strong></li>
+                        <li><span>IP do Aparelho:</span> <strong id="net-ip">--</strong></li>
+                        <li><span>MAC Local:</span> <strong id="net-mac">--</strong></li>
+                        <li><span>Máscara:</span> <strong id="net-mask">--</strong></li>
+                        <li><span>Gateway:</span> <strong id="net-gw">--</strong></li>
+                        <li><span>Servidores DNS:</span> <strong id="net-dns">--</strong></li>
+                    </ul>
+                </div>
+            </div>
+
+            <div class="card">
+                <div class="card-header-flex">
+                    <h3>Histórico de Latência Recente</h3>
+                    <span class="text-muted text-small">Últimas checagens</span>
+                </div>
+                <div id="history-chart" class="history-container">
+                    <!-- Barras de latência inseridas via JS -->
+                </div>
+            </div>
+        </section>
+
+        <!-- ABA 2: DISPOSITIVOS -->
+        <section id="tab-devices" class="tab-content">
+            <!-- Faixa Compacta "Movimentação Recente" (últimas 5 entradas/saídas) -->
+            <div id="recent-changes-card" class="card recent-changes-card">
+                <div class="recent-changes-header">
+                    <span class="recent-changes-title">&#x1F4E1; Movimentação Recente na Rede</span>
+                    <span class="text-muted text-small">Monitoramento contínuo (15s) &bull; Toque em um host para abrir o relatório</span>
+                </div>
+                <div id="recent-changes-list" class="recent-changes-list">
+                    <span class="text-muted text-small">Aguardando eventos de movimentação na sub-rede atual...</span>
+                </div>
+            </div>
+
+            <div class="card">
+                <div class="card-header-flex">
+                    <div>
+                        <h3>Dispositivos na Rede Local (/24)</h3>
+                        <p id="devices-subnet-subtitle" class="text-muted text-small">Toque em qualquer dispositivo para abrir o Relatório Individual</p>
+                    </div>
+                    <div class="btn-group">
+                        <button id="btn-clear-offline" class="btn btn-outline btn-sm" title="Remover dispositivos offline e de redes antigas">
+                            Limpar Histórico
+                        </button>
+                        <button id="btn-scan" class="btn btn-primary">
+                            <span id="scan-icon">&#x1F50D;</span>
+                            <span id="scan-text">Escanear Rede</span>
+                        </button>
+                    </div>
+                </div>
+
+                <div id="scan-progress" class="progress-bar-container hidden">
+                    <div class="progress-bar-indeterminate"></div>
+                    <span class="text-small text-muted">Verificando presença ativa na sub-rede /24...</span>
+                </div>
+
+                <div class="table-responsive devices-table-container">
+                    <table class="data-table devices-table">
+                        <thead>
+                            <tr>
+                                <th>Endereço IP</th>
+                                <th>Hostname &amp; Perfil</th>
+                                <th>MAC &amp; Fabricante</th>
+                                <th>Portas Abertas</th>
+                                <th>Latência</th>
+                                <th>Sessão &amp; Visto</th>
+                                <th>Status</th>
+                            </tr>
+                        </thead>
+                        <tbody id="devices-tbody">
+                            <tr><td colspan="7" class="text-center text-muted">Carregando dispositivos...</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </section>
+
+        <!-- ABA 3: SOC AUTOMÁTICO (MITRE ATT&CK) -->
+        <section id="tab-soc" class="tab-content">
+            <!-- Card 1: Postura da Rede & Sensores Automáticos -->
+            <div class="card soc-posture-card">
+                <div class="soc-posture-top">
+                    <div>
+                        <span class="text-small text-muted">POSTURA DE SEGURANÇA DA SUB-REDE ATUAL</span>
+                        <div class="soc-posture-headline">
+                            <span id="soc-posture-pill" class="soc-posture-badge soc-posture-safe">SEGURO</span>
+                            <span id="soc-subnet-label" class="text-small text-muted">--</span>
+                        </div>
+                        <p class="text-small text-muted" style="margin-top:4px;">
+                            Gateway MAC Travado (Anti-MITM): <code id="soc-gw-mac" class="device-mac">--</code>
+                        </p>
+                    </div>
+                    <div class="soc-counts-row">
+                        <div class="soc-count-box soc-cnt-crit">
+                            <span>CRÍTICOS</span>
+                            <strong id="soc-cnt-critical">0</strong>
+                        </div>
+                        <div class="soc-count-box soc-cnt-high">
+                            <span>ALTOS</span>
+                            <strong id="soc-cnt-high">0</strong>
+                        </div>
+                        <div class="soc-count-box soc-cnt-med">
+                            <span>MÉDIOS</span>
+                            <strong id="soc-cnt-medium">0</strong>
+                        </div>
+                    </div>
+                </div>
+
+                <div id="soc-sensors-grid" class="soc-sensors-grid">
+                    <!-- 4 Chips de sensores automáticos renderizados via JS -->
+                </div>
+            </div>
+
+            <!-- Card 2: Baseline da Rede (1 Toque) -->
+            <div class="card soc-baseline-card">
+                <div class="card-header-flex" style="margin-bottom:0;">
+                    <div>
+                        <h3>&#x1F512; Baseline de Dispositivos Autorizados (MITRE T1200)</h3>
+                        <p id="soc-baseline-desc" class="text-muted text-small">
+                            Com um toque, autoriza os dispositivos atualmente conectados e alerta automaticamente qualquer aparelho novo na rede.
+                        </p>
+                    </div>
+                    <button id="btn-soc-baseline-toggle" type="button" class="btn btn-primary">
+                        Travar Baseline da Rede Atual
+                    </button>
+                </div>
+            </div>
+
+            <!-- Card 3: Feed de Alertas SOC -->
+            <div class="card">
+                <div class="card-header-flex">
+                    <div>
+                        <h3>Alertas SOC Automáticos (MITRE ATT&amp;CK)</h3>
+                        <p class="text-muted text-small">Detecção passiva e ativa contínua sem root: ARP Spoofing, DNS Hijacking, Port Drift e Rogue Devices</p>
+                    </div>
+                </div>
+                <div id="soc-alerts-list" class="soc-alerts-list">
+                    <p class="text-center text-muted text-small">Carregando alertas SOC...</p>
+                </div>
+            </div>
+        </section>
+
+        <!-- ABA 4: SERVIÇOS MONITORADOS -->
+        <section id="tab-services" class="tab-content">
+            <div class="card">
+                <div class="card-header-flex">
+                    <div>
+                        <h3>Auditoria de Serviços de Aplicação</h3>
+                        <p class="text-muted text-small">Testes reais: SSH (banner), DNS (A), HTTP/HTTPS (TLS/status)</p>
+                    </div>
+                    <div class="btn-group">
+                        <button id="btn-verify-services" class="btn btn-secondary">Testar Todos Agora</button>
+                        <button id="btn-open-modal" class="btn btn-primary">+ Adicionar Alvo</button>
+                    </div>
+                </div>
+
+                <div class="table-responsive">
+                    <table class="data-table">
+                        <thead>
+                            <tr>
+                                <th>Serviço</th>
+                                <th>Destino</th>
+                                <th>Protocolo</th>
+                                <th>Status</th>
+                                <th>Latência</th>
+                                <th>Detalhes / Banner</th>
+                                <th>Ações</th>
+                            </tr>
+                        </thead>
+                        <tbody id="services-tbody">
+                            <tr><td colspan="7" class="text-center text-muted">Carregando serviços...</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </section>
+
+        <!-- ABA 5: RELATÓRIOS & EVENTOS -->
+        <section id="tab-reports" class="tab-content">
+            <div class="card export-card">
+                <h3>Exportar Relatório Técnico Completo</h3>
+                <p class="text-muted">Gera relatório consolidado com dados de hardware, rede, postura SOC, dispositivos e auditoria.</p>
+                <div class="btn-group-export">
+                    <a href="/api/report/markdown" target="_blank" class="btn btn-outline">
+                        <span>&#x1F4DD;</span> Baixar Relatório Markdown (.md)
+                    </a>
+                    <a href="/api/report/json" target="_blank" class="btn btn-outline">
+                        <span>&#x1F5C4;</span> Baixar Dados Brutos (.json)
+                    </a>
+                </div>
+            </div>
+
+            <div class="card">
+                <div class="card-header-flex">
+                    <h3>Registro de Eventos &amp; Alertas</h3>
+                    <span class="text-muted text-small">Histórico recente</span>
+                </div>
+                <div class="table-responsive">
+                    <table class="data-table">
+                        <thead>
+                            <tr>
+                                <th>Data/Hora</th>
+                                <th>Tipo</th>
+                                <th>Severidade</th>
+                                <th>Mensagem</th>
+                            </tr>
+                        </thead>
+                        <tbody id="events-tbody">
+                            <tr><td colspan="4" class="text-center text-muted">Carregando eventos...</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <!-- Modal de Relatório Individual do Dispositivo -->
+    <div id="device-report-modal" class="modal hidden">
+        <div class="modal-content modal-lg">
+            <div class="modal-header device-modal-header">
+                <div>
+                    <div class="device-modal-title-row">
+                        <h3 id="dm-ip">0.0.0.0</h3>
+                        <span id="dm-status-pill" class="pill pill-operacional">ONLINE</span>
+                        <span id="dm-trust-badge" class="role-badge role-trusted hidden">CONFIÁVEL</span>
+                    </div>
+                    <p id="dm-hostname" class="text-muted text-small">Carregando perfil...</p>
+                    <div class="device-modal-badges">
+                        <span id="dm-device-type" class="role-badge role-gateway">Dispositivo</span>
+                        <span id="dm-vendor" class="role-badge role-vendor">Fabricante OUI</span>
+                        <code id="dm-mac" class="device-mac">00:00:00:00:00:00</code>
+                    </div>
+                </div>
+                <button id="btn-close-device-modal" class="btn-close" title="Fechar">&times;</button>
+            </div>
+
+            <div class="device-modal-body">
+                <!-- Barra de Confiança SOC & Apelido do Dispositivo -->
+                <div class="dm-section dm-trust-section">
+                    <h4>&#x1F6E1; Controle SOC &amp; Identificação</h4>
+                    <div class="dm-trust-controls">
+                        <button type="button" id="dm-trust-btn" class="btn btn-outline btn-sm">
+                            Marcar como Confiável
+                        </button>
+                        <div class="dm-custom-name-box">
+                            <input type="text" id="dm-custom-name-input" placeholder="Apelido opcional (ex: Notebook João)">
+                            <button type="button" id="dm-save-name-btn" class="btn btn-secondary btn-sm">Salvar</button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Bloco 1: Tempo & Disponibilidade -->
+                <div class="dm-section">
+                    <h4>&#x23F1; Tempo &amp; Disponibilidade</h4>
+                    <div class="dm-grid-3">
+                        <div class="dm-metric-box">
+                            <span class="dm-label">Sessão Atual</span>
+                            <strong id="dm-session-dur">--</strong>
+                        </div>
+                        <div class="dm-metric-box">
+                            <span class="dm-label">Tempo Acumulado</span>
+                            <strong id="dm-total-online">--</strong>
+                        </div>
+                        <div class="dm-metric-box">
+                            <span class="dm-label">Disponibilidade</span>
+                            <strong id="dm-uptime">--%</strong>
+                        </div>
+                        <div class="dm-metric-box">
+                            <span class="dm-label">Primeira Detecção</span>
+                            <strong id="dm-first-seen" class="text-small">--</strong>
+                        </div>
+                        <div class="dm-metric-box">
+                            <span class="dm-label">Última Detecção</span>
+                            <strong id="dm-last-seen" class="text-small">--</strong>
+                        </div>
+                        <div class="dm-metric-box">
+                            <span class="dm-label">Quedas / Saídas</span>
+                            <strong id="dm-disconnects">0</strong>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Bloco 2: Desempenho & Tráfego -->
+                <div class="dm-section">
+                    <h4>&#x1F4CA; Desempenho &amp; Tráfego</h4>
+                    <div class="dm-grid-3">
+                        <div class="dm-metric-box">
+                            <span class="dm-label">Latência Mínima</span>
+                            <strong id="dm-lat-min">-- ms</strong>
+                        </div>
+                        <div class="dm-metric-box">
+                            <span class="dm-label">Latência Média</span>
+                            <strong id="dm-lat-avg">-- ms</strong>
+                        </div>
+                        <div class="dm-metric-box">
+                            <span class="dm-label">Latência Máxima</span>
+                            <strong id="dm-lat-max">-- ms</strong>
+                        </div>
+                    </div>
+                    <div id="dm-traffic-box" class="dm-traffic-box">
+                        <!-- Preenchido via JS -->
+                    </div>
+                </div>
+
+                <!-- Bloco 3: Serviços & Portas Detectadas -->
+                <div class="dm-section">
+                    <h4>&#x1F512; Serviços &amp; Portas Detectadas</h4>
+                    <div id="dm-services-list" class="dm-services-list">
+                        <!-- Preenchido via JS -->
+                    </div>
+                </div>
+
+                <!-- Bloco 4: Alertas SOC deste Dispositivo -->
+                <div class="dm-section">
+                    <h4>&#x1F6A8; Alertas SOC deste Dispositivo (MITRE ATT&amp;CK)</h4>
+                    <div id="dm-soc-alerts-list" class="dm-events-list">
+                        <!-- Preenchido via JS -->
+                    </div>
+                </div>
+
+                <!-- Bloco 5: Histórico deste Host -->
+                <div class="dm-section">
+                    <h4>&#x1F4DC; Histórico de Conexão deste Host</h4>
+                    <div id="dm-events-list" class="dm-events-list">
+                        <!-- Preenchido via JS -->
+                    </div>
+                </div>
+            </div>
+
+            <div class="modal-actions device-modal-footer">
+                <a id="btn-export-device-md" href="#" target="_blank" class="btn btn-primary">
+                    &#x1F4DD; Exportar Relatório do Host (.md)
+                </a>
+                <button type="button" id="btn-close-device-footer" class="btn btn-secondary">Fechar</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal Adicionar Serviço -->
+    <div id="service-modal" class="modal hidden">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>Adicionar Novo Serviço Monitorado</h3>
+                <button id="btn-close-modal" class="btn-close">&times;</button>
+            </div>
+            <form id="form-add-service">
+                <div class="form-group">
+                    <label for="srv-name">Nome Amigável:</label>
+                    <input type="text" id="srv-name" required placeholder="Ex: Gateway Local, Roteador Principal">
+                </div>
+                <div class="form-row">
+                    <div class="form-group flex-2">
+                        <label for="srv-host">Host / IP:</label>
+                        <input type="text" id="srv-host" required placeholder="192.168.1.1 ou dominio.com">
+                    </div>
+                    <div class="form-group flex-1">
+                        <label for="srv-port">Porta:</label>
+                        <input type="number" id="srv-port" required value="80">
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label for="srv-type">Tipo de Validação:</label>
+                    <select id="srv-type">
+                        <option value="HTTP">HTTP (Status Code)</option>
+                        <option value="HTTPS">HTTPS (Handshake TLS)</option>
+                        <option value="DNS">DNS (Consulta de Registro A)</option>
+                        <option value="SSH">SSH (Leitura de Banner)</option>
+                        <option value="TCP">TCP Genérico (Socket Connect)</option>
+                    </select>
+                </div>
+                <div class="modal-actions">
+                    <button type="button" id="btn-cancel-modal" class="btn btn-secondary">Cancelar</button>
+                    <button type="submit" class="btn btn-primary">Salvar e Testar</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <footer class="footer">
+        <p>NetWatch E6 &bull; Motorola Moto E6 Play (MT6739WW / Android 9 Pie) &bull; Bind Seguro 127.0.0.1:5000</p>
+    </footer>
+
+    <script src="/static/app.js"></script>
+</body>
+</html>
