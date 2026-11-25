@@ -1,0 +1,579 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>NetWatch E6 — Especificação Técnica e Visão de Produto</title>
+  <style>
+    :root {
+      --ink: #111827;
+      --ink-secondary: #374151;
+      --ink-muted: #6B7280;
+      --navy: #0F2942;
+      --navy-accent: #1D4ED8;
+      --border: #D1D5DB;
+      --surface-alt: #F8FAFC;
+      --bg-page: #E5E7EB;
+      --paper: #FFFFFF;
+      --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      --font-serif: 'Georgia', 'Times New Roman', serif;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      background-color: var(--bg-page);
+      color: var(--ink);
+      font-family: var(--font-sans);
+      line-height: 1.62;
+      font-size: 10.5pt;
+      -webkit-font-smoothing: antialiased;
+      padding: 32px 16px 64px;
+    }
+
+    /* Barra de ferramentas apenas em tela (oculta na impressão/PDF) */
+    .screen-toolbar {
+      max-width: 210mm;
+      margin: 0 auto 20px;
+      background: var(--navy);
+      color: #FFFFFF;
+      padding: 12px 20px;
+      border-radius: 8px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+    }
+
+    .screen-toolbar-title {
+      font-size: 13px;
+      font-weight: 500;
+      opacity: 0.92;
+    }
+
+    .btn-print {
+      background: #FFFFFF;
+      color: var(--navy);
+      border: none;
+      padding: 8px 16px;
+      border-radius: 6px;
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+      font-family: var(--font-sans);
+    }
+
+    .btn-print:hover {
+      background: #F1F5F9;
+    }
+
+    /* Folha A4 editorial */
+    .document-sheet {
+      max-width: 210mm;
+      margin: 0 auto;
+      background: var(--paper);
+      padding: 22mm 20mm 24mm;
+      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.08);
+      border-radius: 2px;
+    }
+
+    /* Cabeçalho Formal / Capa Executiva */
+    .doc-header {
+      border-bottom: 2px solid var(--navy);
+      padding-bottom: 20px;
+      margin-bottom: 24px;
+    }
+
+    .doc-kicker {
+      font-size: 9pt;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+      color: var(--navy-accent);
+      margin-bottom: 8px;
+    }
+
+    .doc-title {
+      font-size: 22pt;
+      font-weight: 800;
+      color: var(--navy);
+      letter-spacing: -0.02em;
+      line-height: 1.18;
+      margin-bottom: 10px;
+    }
+
+    .doc-subtitle {
+      font-size: 12pt;
+      font-family: var(--font-serif);
+      font-style: italic;
+      color: var(--ink-secondary);
+      line-height: 1.45;
+      margin-bottom: 18px;
+    }
+
+    .meta-grid {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 12px;
+      background: var(--surface-alt);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 10px 14px;
+      font-size: 8.8pt;
+    }
+
+    .meta-item-label {
+      font-weight: 700;
+      text-transform: uppercase;
+      font-size: 7.5pt;
+      letter-spacing: 0.06em;
+      color: var(--ink-muted);
+      display: block;
+      margin-bottom: 2px;
+    }
+
+    .meta-item-val {
+      font-weight: 600;
+      color: var(--ink);
+    }
+
+    /* Abstract Box */
+    .abstract-box {
+      background: var(--surface-alt);
+      border-left: 4px solid var(--navy);
+      padding: 16px 20px;
+      margin-bottom: 26px;
+      border-radius: 0 6px 6px 0;
+    }
+
+    .abstract-title {
+      font-size: 9.5pt;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: var(--navy);
+      margin-bottom: 8px;
+    }
+
+    .abstract-text {
+      font-size: 10pt;
+      color: var(--ink-secondary);
+      text-align: justify;
+      line-height: 1.6;
+      margin-bottom: 10px;
+    }
+
+    .abstract-keywords {
+      font-size: 9pt;
+      color: var(--ink);
+    }
+
+    /* Seções e Títulos */
+    section {
+      margin-bottom: 24px;
+    }
+
+    h2 {
+      font-size: 13.5pt;
+      font-weight: 750;
+      color: var(--navy);
+      border-bottom: 1px solid var(--border);
+      padding-bottom: 5px;
+      margin-top: 22px;
+      margin-bottom: 12px;
+      letter-spacing: -0.01em;
+      page-break-after: avoid;
+    }
+
+    h3 {
+      font-size: 11pt;
+      font-weight: 700;
+      color: var(--ink);
+      margin-top: 14px;
+      margin-bottom: 6px;
+      page-break-after: avoid;
+    }
+
+    p {
+      margin-bottom: 10px;
+      color: var(--ink-secondary);
+      text-align: justify;
+    }
+
+    ul, ol {
+      margin: 8px 0 14px 20px;
+      color: var(--ink-secondary);
+    }
+
+    li {
+      margin-bottom: 6px;
+      text-align: justify;
+    }
+
+    li strong, p strong {
+      color: var(--ink);
+      font-weight: 600;
+    }
+
+    /* Tabelas Executivas */
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 14px 0 18px;
+      font-size: 9.2pt;
+      page-break-inside: avoid;
+    }
+
+    th {
+      background-color: var(--navy);
+      color: #FFFFFF;
+      font-weight: 600;
+      text-align: left;
+      padding: 8px 10px;
+      border: 1px solid var(--navy);
+    }
+
+    td {
+      padding: 8px 10px;
+      border: 1px solid var(--border);
+      color: var(--ink-secondary);
+      vertical-align: top;
+      text-align: left;
+    }
+
+    tr:nth-child(even) td {
+      background-color: var(--surface-alt);
+    }
+
+    /* Diagrama Arquitetural Limpo */
+    .arch-diagram {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 10px;
+      margin: 14px 0 18px;
+      page-break-inside: avoid;
+    }
+
+    .arch-box {
+      border: 1px solid var(--border);
+      background: var(--surface-alt);
+      border-radius: 6px;
+      padding: 12px;
+    }
+
+    .arch-box-step {
+      font-size: 8pt;
+      font-weight: 700;
+      text-transform: uppercase;
+      color: var(--navy-accent);
+      margin-bottom: 4px;
+    }
+
+    .arch-box-title {
+      font-size: 9.8pt;
+      font-weight: 700;
+      color: var(--navy);
+      margin-bottom: 6px;
+    }
+
+    .arch-box-desc {
+      font-size: 8.6pt;
+      color: var(--ink-secondary);
+      line-height: 1.45;
+      text-align: left;
+    }
+
+    /* Cartões de Roadmap */
+    .roadmap-grid {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 12px;
+      margin: 12px 0;
+    }
+
+    .roadmap-card {
+      border: 1px solid var(--border);
+      border-left: 4px solid var(--navy-accent);
+      background: var(--surface-alt);
+      padding: 12px 16px;
+      border-radius: 0 6px 6px 0;
+      page-break-inside: avoid;
+    }
+
+    .roadmap-card h3 {
+      margin-top: 0;
+      color: var(--navy);
+    }
+
+    .note-box {
+      background: #F1F5F9;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 10px 14px;
+      font-size: 9.2pt;
+      color: var(--ink-secondary);
+      margin: 10px 0 14px;
+      page-break-inside: avoid;
+    }
+
+    .doc-footer {
+      margin-top: 32px;
+      padding-top: 12px;
+      border-top: 1px solid var(--border);
+      display: flex;
+      justify-content: space-between;
+      font-size: 8.5pt;
+      color: var(--ink-muted);
+    }
+
+    @media print {
+      @page {
+        size: A4 portrait;
+        margin: 16mm 16mm 18mm 16mm;
+      }
+
+      body {
+        background: #FFFFFF;
+        padding: 0;
+        font-size: 10pt;
+      }
+
+      .screen-toolbar {
+        display: none !important;
+      }
+
+      .document-sheet {
+        max-width: 100%;
+        box-shadow: none;
+        padding: 0;
+        margin: 0;
+      }
+    }
+  </style>
+</head>
+<body>
+
+  <div class="screen-toolbar">
+    <span class="screen-toolbar-title">NetWatch E6 — Documento Técnico e Executivo (Formato Editorial A4)</span>
+    <button class="btn-print" type="button" onclick="window.print()">Imprimir / Salvar como PDF</button>
+  </div>
+
+  <article class="document-sheet">
+    <!-- 1. CAPA / CABEÇALHO FORMAL -->
+    <header class="doc-header">
+      <div class="doc-kicker">Especificação de Engenharia &amp; Proposta Estratégica de Produto</div>
+      <h1 class="doc-title">NetWatch E6 — Especificação Técnica e Visão de Produto</h1>
+      <div class="doc-subtitle">
+        Monitoramento Autônomo de Redes Locais, Diagnóstico de Conectividade e Defesa Automatizada em Hardware de Baixo Custo Sem Acesso Root
+      </div>
+
+      <div class="meta-grid">
+        <div>
+          <span class="meta-item-label">Versão do Documento</span>
+          <span class="meta-item-val">1.0 — Edição Executiva</span>
+        </div>
+        <div>
+          <span class="meta-item-label">Plataforma de Referência</span>
+          <span class="meta-item-val">Motorola Moto E6 Play (Android 9)</span>
+        </div>
+        <div>
+          <span class="meta-item-label">Operação &amp; Privacidade</span>
+          <span class="meta-item-val">100% Local • Sem Root • Sem Nuvem</span>
+        </div>
+        <div>
+          <span class="meta-item-label">Classificação</span>
+          <span class="meta-item-val">Arquitetura Técnica &amp; Roadmap</span>
+        </div>
+      </div>
+    </header>
+
+    <!-- 2. ABSTRACT (RESUMO EXECUTIVO) -->
+    <div class="abstract-box">
+      <div class="abstract-title">Abstract (Resumo Executivo)</div>
+      <p class="abstract-text">
+        A visibilidade de redes locais em ambientes residenciais e em pequenas e médias empresas enfrenta historicamente uma barreira de custo e complexidade: soluções corporativas exigem hardware dedicado, licenciamento recorrente, acesso administrativo a roteadores ou infraestrutura em nuvem que compromete a privacidade dos usuários. O <strong>NetWatch E6</strong> soluciona essa lacuna ao converter um smartphone comercial de baixo custo — operando integralmente com o sistema original de fábrica, sem acesso root e sem dependência de servidores externos — em uma estação autônoma de monitoramento de rede, diagnóstico de conectividade e detecção de ameaças. A arquitetura embarcada combina coletores assíncronos em Python, banco de dados SQLite em modo de alta concorrência e servidor web isolado em interface local (127.0.0.1). Em operação real, o sistema mapeia uma rede IPv4 /24 completa (254 endereços) em aproximadamente <strong>3,6 segundos</strong> (~0,8 segundo para ativos conhecidos), audita <strong>16 portas TCP</strong> por equipamento e executa <strong>5 sensores contínuos de defesa</strong> alinhados à matriz MITRE ATT&amp;CK em regime 24/7. Além da prova de conceito validada em campo, o projeto estabelece a base técnica para evolução comercial rumo a uma plataforma de experiência simplificada, integrando filtragem DNS na porta 53, controle parental e atuação ativa em hardware dedicado ou ambiente privilegiado.
+      </p>
+      <div class="abstract-keywords">
+        <strong>Palavras-chave:</strong> Monitoramento de Redes Locais; Detecção de Intrusão Sem Root; Diagnóstico de Conectividade; MITRE ATT&amp;CK; Segurança Embarcada em Android.
+      </div>
+    </div>
+
+    <!-- 3. CONTEXTUALIZAÇÃO DO PROBLEMA E PROPOSTA DE VALOR -->
+    <section>
+      <h2>1. Contextualização do Problema e Proposta de Valor</h2>
+      <p>
+        <strong>O Problema de Mercado:</strong> Redes Wi-Fi residenciais, escritórios enxutos, clínicas e comércios operam hoje com dezenas de dispositivos conectados — computadores, celulares, televisores inteligentes, câmeras e equipamentos de automação — sem qualquer instrumento de visibilidade ou defesa local. Quando ocorre degradação de conectividade, o usuário não consegue distinguir se a falha reside no roteador interno, no link da operadora ou no serviço DNS. De forma ainda mais crítica, a entrada de equipamentos não autorizados, a exposição acidental de portas sensíveis ou ataques de interceptação local ocorrem de maneira invisível, pois soluções tradicionais exigem servidores dedicados, acesso administrativo ao roteador ou softwares complexos.
+      </p>
+      <p>
+        <strong>A Proposta Técnica:</strong> O NetWatch E6 comprova que é possível entregar monitoramento contínuo, diagnóstico de causa raiz e detecção defensiva em um smartphone de entrada preservando integralmente a segurança original do aparelho. Operando sem acesso root e respeitando o Secure Boot e as políticas de isolamento do Android 9, a arquitetura elimina riscos à integridade física do dispositivo enquanto mantém alta precisão de descoberta.
+      </p>
+      <p>
+        <strong>Diferencial Estratégico e Viés de Investimento:</strong> A solução combina quatro pilares de alta atratividade comercial: (1) <em>baixíssimo custo de hardware</em>, permitindo reaproveitar smartphones existentes ou utilizar placas embarcadas acessíveis; (2) <em>implantação imediata</em>, bastando conectar ao Wi-Fi sem alterar configurações do roteador; (3) <em>privacidade por padrão</em>, com operação 100% local e zero custo ou risco de nuvem; e (4) <em>autonomia 24/7</em> para operação contínua sem supervisão técnica.
+      </p>
+    </section>
+
+    <!-- 4. ARQUITETURA TÉCNICA ATUAL (VERSÃO SEM ROOT) -->
+    <section>
+      <h2>2. Arquitetura Técnica Atual (Versão Sem Root)</h2>
+      <p>
+        O sistema opera embarcado no ambiente Termux em quatro camadas desacopladas, projetadas para baixo consumo de memória e resposta imediata no próprio visor do smartphone:
+      </p>
+
+      <div class="arch-diagram">
+        <div class="arch-box">
+          <div class="arch-box-step">Camada 1</div>
+          <div class="arch-box-title">Coletores em Python</div>
+          <div class="arch-box-desc">Dois ciclos assíncronos independentes: rede local a cada 15s (~3,6s por varredura /24) e conectividade externa/DNS a cada 30s.</div>
+        </div>
+        <div class="arch-box">
+          <div class="arch-box-step">Camada 2</div>
+          <div class="arch-box-title">SQLite em Modo WAL</div>
+          <div class="arch-box-desc">Isolamento de dados por sub-rede Wi-Fi, histórico das últimas 100 latências por IP e deduplicação de alertas sem bloqueio de leitura.</div>
+        </div>
+        <div class="arch-box">
+          <div class="arch-box-step">Camada 3</div>
+          <div class="arch-box-title">Servidor Web Isolado</div>
+          <div class="arch-box-desc">API Flask restrita exclusivamente ao endereço interno 127.0.0.1:5000, invisível para os demais equipamentos conectados ao Wi-Fi.</div>
+        </div>
+        <div class="arch-box">
+          <div class="arch-box-step">Camada 4</div>
+          <div class="arch-box-title">Painel em Tela Cheia</div>
+          <div class="arch-box-desc">Cinco módulos operacionais: Visão Geral, Dispositivos, Serviços, Defesa (SOC) e Relatórios exportáveis em Markdown e JSON.</div>
+        </div>
+      </div>
+
+      <ul>
+        <li><strong>Ciclo Rápido de Rede Local (15s) e Detecção Sem Ping:</strong> prioriza a verificação de equipamentos já conhecidos (~0,8s) e varre os 254 endereços da rede /24 em ~3,6s. Para detectar celulares modernos e computadores com firewall bloqueando ICMP, combina tentativas rápidas de conexão TCP (porta aberta ou recusa controlada da pilha de rede), sondas UDP, leitura da tabela interna de vizinhos do sistema e fallback de ping.</li>
+        <li><strong>Ciclo Externo (30s) e Identificação Camada 7:</strong> testa a cadeia Roteador → Internet → DNS e valida respostas reais de DNS, SSH, HTTP e HTTPS/TLS. Audita 16 portas TCP por equipamento, captura cabeçalhos leves de serviços e cruza com base offline de fabricantes MAC, priorizando a assinatura real do serviço (Camada 7) em caso de divergência ou uso de MAC aleatório.</li>
+      </ul>
+    </section>
+
+    <!-- 5. ENGENHARIA DE ESCOPO, DESEMPENHO E COMPORTAMENTO EM IPV4/IPV6 -->
+    <section>
+      <h2>3. Engenharia de Escopo, Desempenho e Comportamento em IPv4/IPv6</h2>
+      <h3>3.1. Proteção em Redes Grandes (Teto Automático /24)</h3>
+      <p>
+        Em redes corporativas, shoppings ou universidades, uma única sub-rede pode utilizar máscaras /22, /20 ou /16 (até <strong>65.534 endereços IP</strong>). Tentar varrer dezenas de milhares de endereços simultaneamente em um smartphone comum causaria esgotamento de memória, aquecimento e drenagem de bateria. Para evitar esse cenário, o NetWatch E6 aplica automaticamente um <strong>limite de escopo /24</strong>: ao detectar uma faixa maior que 254 endereços, o motor recorta a varredura ativa apenas para o bloco local de 254 IPs onde o smartphone está alocado (por exemplo, em uma rede 10.0.0.0/16 onde o aparelho recebe o IP 10.0.15.42, o sistema varre exclusivamente de 10.0.15.1 a 10.0.15.254), mantendo o tempo de ciclo constante em <strong>~3,6 segundos</strong>.
+      </p>
+
+      <h3>3.2. Comportamento em Redes IPv6</h3>
+      <p>
+        A varredura ativa sequencial do NetWatch E6 é direcionada ao protocolo <strong>IPv4</strong>, no qual uma sub-rede local padrão (/24) possui 254 endereços verificáveis em poucos segundos. No protocolo <strong>IPv6</strong>, uma sub-rede padrão (/64) abrange cerca de <strong>18 quintilhões de endereços</strong>, tornando matematicamente inviável a varredura sequencial IP por IP. Como as redes residenciais e corporativas modernas operam em pilha dupla (IPv4 e IPv6 juntos), o monitoramento ocorre normalmente através do IPv4; em redes configuradas exclusivamente em IPv6, o sistema não executa varredura ativa de faixa e passa a identificar os equipamentos por meio da tabela passiva de vizinhos do sistema operacional (protocolo NDP).
+      </p>
+    </section>
+
+    <!-- 6. MOTOR DE DEFESA AUTOMÁTICA (MITRE ATT&CK) -->
+    <section>
+      <h2>4. Motor de Defesa Automática (Mapeamento MITRE ATT&amp;CK)</h2>
+      <p>
+        O sistema executa cinco sensores defensivos automatizados a cada ciclo de varredura, classificando a postura da rede em <em>Seguro</em>, <em>Atenção</em> ou <em>Crítico</em>:
+      </p>
+
+      <table>
+        <thead>
+          <tr>
+            <th style="width: 22%;">Sensor Defensivo</th>
+            <th style="width: 14%;">MITRE ATT&amp;CK</th>
+            <th style="width: 12%;">Severidade</th>
+            <th style="width: 52%;">Funcionamento Técnico e Proteção Entregue</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><strong>1. Proteção ARP (Roteador)</strong></td>
+            <td>T1557.002</td>
+            <td>Crítico</td>
+            <td>Fixa o endereço físico inicial do roteador da rede e detecta trocas repentinas ou endereços físicos duplicados tentando interceptar o tráfego local.</td>
+          </tr>
+          <tr>
+            <td><strong>2. Integridade de DNS</strong></td>
+            <td>T1557</td>
+            <td>Crítico</td>
+            <td>Compara a resposta do DNS local com DNS sobre HTTPS (DoH) e valida o certificado TLS real na porta 443, evitando falsos positivos causados por redes de distribuição de conteúdo (CDNs).</td>
+          </tr>
+          <tr>
+            <td><strong>3. Portas Críticas e Alterações</strong></td>
+            <td>T1021 / T1046</td>
+            <td>Alto / Médio</td>
+            <td>Alerta sobre exposição de portas de alto risco (21, 23, 445, 3389, 5555) ou abertura repentina de novas portas em relação ao histórico do equipamento.</td>
+          </tr>
+          <tr>
+            <td><strong>4. Trava de Rede Confiável</strong></td>
+            <td>T1200</td>
+            <td>Alto</td>
+            <td>Autoriza os aparelhos conhecidos com um toque e dispara alerta imediato caso qualquer dispositivo desconhecido se conecte ao Wi-Fi.</td>
+          </tr>
+          <tr>
+            <td><strong>5. Auditoria de Certificados TLS</strong></td>
+            <td>T1557</td>
+            <td>Alto / Médio</td>
+            <td>Inspeciona serviços HTTPS ativos na rede e alerta sobre certificados digitais expirados ou com vencimento inferior a 15 dias.</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <div class="note-box">
+        <strong>Recomendação Operacional (Trava de Rede Confiável):</strong> A trava de aparelhos autorizados (T1200) é recomendada para redes sob controle do proprietário (residências, escritórios e comércios). Em redes públicas abertas com alta rotatividade de visitantes, recomenda-se mantê-la desativada para evitar fadiga de alertas.
+      </div>
+    </section>
+
+    <!-- 7. SEGURANÇA OPERACIONAL, CONFIABILIDADE E LIMITES ATUAIS -->
+    <section>
+      <h2>5. Segurança Operacional, Confiabilidade e Limites Atuais</h2>
+      <ul>
+        <li><strong>Isolamento e Continuidade 24/7:</strong> o painel web responde apenas na tela do próprio aparelho (com projeção externa restrita a túnel via cabo USB). O sistema pausa automaticamente as varreduras caso o Wi-Fi seja desconectado (protegendo a rede móvel da operadora), inicia sozinho ao ligar o smartphone, mantém a execução com a tela apagada e conta com suíte automatizada de <strong>10 testes unitários</strong>.</li>
+        <li><strong>Limites Arquiteturais Transparentes (Modo Sem Root):</strong> operando sem acesso root e sem controle sobre o roteador, o sistema mede o volume real de tráfego (RX/TX) apenas do próprio aparelho (devido ao isolamento de Camada 2, o tráfego de terceiros vai direto ao roteador), não realiza captura promíscua de pacotes de outros usuários e não executa bloqueio ativo de conexões.</li>
+      </ul>
+    </section>
+
+    <!-- 8. PROPOSTA FUTURA E POTENCIAL DE DESENVOLVIMENTO -->
+    <section>
+      <h2>6. Proposta Futura e Potencial de Desenvolvimento (Roadmap de Produto)</h2>
+      <p>
+        A arquitetura validada no NetWatch E6 constitui o núcleo tecnológico para evolução rumo a um produto comercial escalável, estruturado em três frentes de desenvolvimento e investimento:
+      </p>
+
+      <div class="roadmap-grid">
+        <div class="roadmap-card">
+          <h3>1. Evolução para Ambiente Privilegiado (Acesso Root ou Hardware Dedicado)</h3>
+          <p>
+            A adoção de dispositivos com privilégios de sistema ou hardware dedicado de baixo custo supera as barreiras do espaço de usuário, habilitando <strong>defesa ativa na rede</strong>: bloqueio automático de equipamentos invasores, isolamento imediato de tráfego suspeito e medição detalhada de consumo de banda por dispositivo conectado.
+          </p>
+        </div>
+
+        <div class="roadmap-card">
+          <h3>2. Módulo Integrado de Filtragem DNS e Controle Parental</h3>
+          <p>
+            Implementação de servidor DNS local na porta 53 com listas atualizáveis para bloqueio de domínios maliciosos, tentativas de fraude (phishing), rastreadores, anúncios e <strong>controle parental por categorias e horários</strong>. Essa camada transforma o produto de um monitor técnico em um controlador completo de segurança, privacidade e bem-estar digital para famílias e pequenos escritórios.
+          </p>
+        </div>
+
+        <div class="roadmap-card">
+          <h3>3. Plataforma Mais Amigável e Experiência de Produto para o Público Geral</h3>
+          <p>
+            Evolução da interface técnica atual para uma plataforma intuitiva voltada a usuários não técnicos, traduzindo alertas complexos em ações diretas de um toque (como <em>"Bloquear aparelho desconhecido"</em>, <em>"Pausar internet das crianças"</em> ou <em>"Verificar segurança do Wi-Fi"</em>), acompanhada de notificações em tempo real e modelo comercial escalável via equipamento pronto para uso ou assinatura de software.
+          </p>
+        </div>
+      </div>
+    </section>
+
+    <!-- 9. CONCLUSÃO -->
+    <section>
+      <h2>7. Conclusão</h2>
+      <p>
+        O <strong>NetWatch E6</strong> demonstra na prática que é possível entregar visibilidade de rede em ~3,6 segundos, diagnóstico preciso de conectividade e defesa automatizada alinhada ao MITRE ATT&amp;CK em hardware acessível, sem acesso root e com privacidade local absoluta. Com a base técnica comprovada em campo e um roteiro claro de evolução para bloqueio ativo, filtragem DNS com controle parental e interface amigável para o consumidor final, o projeto reúne maturidade de engenharia e potencial direto de escala comercial.
+      </p>
+    </section>
+
+    <footer class="doc-footer">
+      <span>NetWatch E6 — Especificação Técnica e Visão de Produto</span>
+      <span>Documento Técnico Executivo • Operação Local e Auditável</span>
+    </footer>
+  </article>
+
+</body>
+</html>
