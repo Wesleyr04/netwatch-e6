@@ -447,7 +447,10 @@ document.addEventListener("DOMContentLoaded", () => {
             latWan.textContent = c.external_latency !== null && c.external_latency !== undefined ? `${c.external_latency} ms` : "FALHA";
             latDns.textContent = c.dns_latency !== null && c.dns_latency !== undefined ? `${c.dns_latency} ms` : "FALHA";
 
-            devCount.textContent = data.metrics.total_devices || 0;
+            const onlineDevs = data.metrics.online_devices !== undefined
+                ? data.metrics.online_devices
+                : (data.metrics.total_devices || 0);
+            devCount.textContent = onlineDevs;
             srvCount.textContent = data.metrics.total_services || 0;
             updateSocNavBadge(data.metrics.soc_open_alerts, data.metrics.soc_posture);
 
@@ -548,7 +551,25 @@ document.addEventListener("DOMContentLoaded", () => {
             const devs = data.devices || [];
             currentBaselineLocked = Boolean(data.baseline_locked);
 
-            devCount.textContent = devs.length;
+            const onlineCount = data.online_count !== undefined
+                ? data.online_count
+                : devs.filter(d => d.status === "ONLINE").length;
+            const offlineCount = data.offline_count !== undefined
+                ? data.offline_count
+                : (devs.length - onlineCount);
+            const clientsOnline = data.online_clients_count !== undefined
+                ? data.online_clients_count
+                : Math.max(0, onlineCount - 2);
+            const infraOnline = data.online_infra_count !== undefined
+                ? data.online_infra_count
+                : Math.max(0, onlineCount - clientsOnline);
+
+            devCount.textContent = onlineCount;
+            if (devicesSubnetSubtitle && currentNetwork.is_connected && currentNetwork.network_cidr) {
+                const lastScanSuffix = data.last_scan_time ? ` • Última verificação: ${data.last_scan_time}` : "";
+                devicesSubnetSubtitle.textContent =
+                    `Sub-rede: ${currentNetwork.network_cidr} • Ativos agora: ${onlineCount} (${clientsOnline} cliente(s) + ${infraOnline} infraestrutura) • Histórico offline: ${offlineCount}${lastScanSuffix}`;
+            }
             renderRecentChanges(data.recent_changes || []);
 
             if (!devs.length) {
@@ -574,10 +595,12 @@ document.addEventListener("DOMContentLoaded", () => {
                 let roleBadge = "";
                 if (isLocalHost) {
                     rowClass += " row-local-host";
-                    roleBadge = '<span class="role-badge role-local">HOST LOCAL</span>';
+                    roleBadge = '<span class="role-badge role-local">HOST LOCAL (INFRA)</span>';
                 } else if (isGateway) {
                     rowClass += " row-gateway";
-                    roleBadge = '<span class="role-badge role-gateway">GATEWAY</span>';
+                    roleBadge = '<span class="role-badge role-gateway">GATEWAY (INFRA)</span>';
+                } else if (device.status === "ONLINE") {
+                    roleBadge = '<span class="role-badge role-client">CLIENTE LAN</span>';
                 }
 
                 // Badge de confiança quando baseline estiver travada ou host for confiável

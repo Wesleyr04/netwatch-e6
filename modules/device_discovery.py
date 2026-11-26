@@ -48,6 +48,12 @@ GENERIC_LAN_LABEL = "Dispositivo na LAN"
 # Janela de destaque visual (segundos) para entradas/saídas recentes
 RECENT_CHANGE_WINDOW_SECONDS = 180
 
+# Histerese anti-flapping: número de ciclos consecutivos sem resposta (3 x 15s = 45s) para marcar OFFLINE
+HYSTERESIS_MAX_MISSED_SCANS = 3
+
+# Estados ativos da tabela de vizinhos (`ip neigh`) que comprovam presença recente em camada 2
+ACTIVE_NEIGHBOR_STATES = {"REACHABLE", "DELAY", "PROBE"}
+
 # Intervalo mínimo (segundos) para reexecutar deep_fingerprint_host em um mesmo IP já ONLINE
 DEEP_FINGERPRINT_INTERVAL_SECONDS = 180
 _LAST_DEEP_FINGERPRINT = {}
@@ -360,7 +366,44 @@ def enrich_device_runtime_fields(d, now_dt=None):
     d["service_details_list"] = srv_list
     d["is_trusted"] = int(d.get("is_trusted") or 0)
     d["custom_name"] = d.get("custom_name") or ""
+    d["missed_scans"] = int(d.get("missed_scans") or 0)
     return d
+
+def calculate_device_counts(devices, my_ip=None, gateway_ip=None):
+    """
+    Calcula métricas separadas de contagem de dispositivos para evitar inflar o contador
+    da interface com registros OFFLINE do histórico ou infraestrutura (Gateway / Host Local):
+      - online_count: total de dispositivos com status == 'ONLINE'
+      - offline_count: total de dispositivos com status != 'ONLINE'
+      - total_count: total geral no banco para a sub-rede
+      - online_clients_count: clientes reais ONLINE (excluindo Host Local e Gateway)
+      - online_infra_count: dispositivos de infraestrutura ONLINE (Host Local e Gateway)
+    """
+    online_count = 0
+    offline_count = 0
+    online_clients_count = 0
+    online_infra_count = 0
+
+    for d in (devices or []):
+        ip = d.get("ip", "")
+        is_online = (d.get("status") == "ONLINE")
+        is_infra = bool((my_ip and ip == my_ip) or (gateway_ip and ip == gateway_ip))
+        if is_online:
+            online_count += 1
+            if is_infra:
+                online_infra_count += 1
+            else:
+                online_clients_count += 1
+        else:
+            offline_count += 1
+
+    return {
+        "online_count": online_count,
+        "offline_count": offline_count,
+        "total_count": len(devices or []),
+        "online_clients_count": online_clients_count,
+        "online_infra_count": online_infra_count
+    }
 
 def sort_devices(devices, my_ip=None, gateway_ip=None):
     """
@@ -435,16 +478,60 @@ def clear_offline_devices(conn, net_info):
     conn.commit()
     return removed
 
-def inspect_neighbor_table(interface="wlan0"):
+def parse_ip_neigh_output(stdout_text):
     """
-    Executa `ip neigh show dev <interface>` e complementa MACs com `/proc/net/arp`.
+    Faz o parsing da saída de `ip neigh show`:
     Retorna:
-      - mac_table: dict {ip: mac} para todos os vizinhos com MAC válido
-      - reachable_ips: set de IPs cujo estado em `ip neigh` é estritamente `REACHABLE`
-        (NUNCA inclui STALE, FAILED, INCOMPLETE ou DELAY).
+      - mac_table: dict {ip: mac} para todos os vizinhos com endereço MAC válido
+      - active_ips: set de IPs cujo estado em `ip neigh` é `REACHABLE`, `DELAY` ou `PROBE`
+      - stale_ips: set de IPs cujo estado é `STALE` e possuem MAC válido (candidatos a re-sondagem)
+      - state_map: dict {ip: state} com o estado bruto em maiúsculas
     """
     mac_table = {}
-    reachable_ips = set()
+    active_ips = set()
+    stale_ips = set()
+    state_map = {}
+
+    for line in (stdout_text or "").splitlines():
+        line_s = line.strip()
+        if not line_s:
+            continue
+        m_ip = re.match(r"^([0-9]+\.[0-9]+\.[0-9]+\.[0-9]+)\b", line_s)
+        if not m_ip:
+            continue
+        ip = m_ip.group(1)
+        tokens = line_s.split()
+        state = tokens[-1].upper() if tokens else ""
+        state_map[ip] = state
+
+        m_mac = re.search(r"\blladdr\s+([0-9a-fA-F:]{17})\b", line_s)
+        has_valid_mac = False
+        if m_mac:
+            mac = m_mac.group(1).upper()
+            if is_valid_mac(mac) and mac != "00:00:00:00:00:00":
+                mac_table[ip] = mac
+                has_valid_mac = True
+
+        if state in ACTIVE_NEIGHBOR_STATES:
+            active_ips.add(ip)
+        elif state == "STALE" and has_valid_mac:
+            stale_ips.add(ip)
+
+    return mac_table, active_ips, stale_ips, state_map
+
+def inspect_neighbor_table(interface="wlan0", include_details=False):
+    """
+    Executa `ip neigh show dev <interface>` e complementa MACs com `/proc/net/arp`.
+    Considera ativos os estados `REACHABLE`, `DELAY` e `PROBE`.
+    Quando `include_details=False` (padrão retrocompatível):
+      Retorna `(mac_table, active_ips)`.
+    Quando `include_details=True`:
+      Retorna `(mac_table, active_ips, stale_ips, state_map)`.
+    """
+    mac_table = {}
+    active_ips = set()
+    stale_ips = set()
+    state_map = {}
 
     for ip_bin in ["ip", "/data/data/com.termux/files/usr/bin/ip", "/system/bin/ip"]:
         try:
@@ -452,22 +539,9 @@ def inspect_neighbor_table(interface="wlan0"):
             if interface and interface != "desconectado":
                 cmd.extend(["dev", interface])
             res = subprocess.run(cmd, capture_output=True, text=True, timeout=1.5)
-            lines = (res.stdout or "").splitlines()
-            if lines:
-                for line in lines:
-                    line_s = line.strip()
-                    m_ip = re.match(r"^([0-9]+\.[0-9]+\.[0-9]+\.[0-9]+)\b", line_s)
-                    if not m_ip:
-                        continue
-                    ip = m_ip.group(1)
-                    m_mac = re.search(r"\blladdr\s+([0-9a-fA-F:]{17})\b", line_s)
-                    if m_mac:
-                        mac = m_mac.group(1).upper()
-                        if is_valid_mac(mac) and mac != "00:00:00:00:00:00":
-                            mac_table[ip] = mac
-                    tokens = line_s.split()
-                    if tokens and tokens[-1].upper() == "REACHABLE":
-                        reachable_ips.add(ip)
+            out = res.stdout or ""
+            if out.strip():
+                mac_table, active_ips, stale_ips, state_map = parse_ip_neigh_output(out)
                 break
         except Exception:
             pass
@@ -479,13 +553,20 @@ def inspect_neighbor_table(interface="wlan0"):
                     parts = line.strip().split()
                     if len(parts) >= 6:
                         ip = parts[0]
+                        flags = parts[2].upper()
                         mac = parts[3].upper()
-                        if ip not in mac_table and is_valid_mac(mac) and mac != "00:00:00:00:00:00":
-                            mac_table[ip] = mac
+                        if is_valid_mac(mac) and mac != "00:00:00:00:00:00" and flags != "0X0":
+                            if ip not in mac_table:
+                                mac_table[ip] = mac
+                            if ip not in state_map:
+                                state_map[ip] = "STALE"
+                                stale_ips.add(ip)
     except Exception:
         pass
 
-    return mac_table, reachable_ips
+    if include_details:
+        return mac_table, active_ips, stale_ips, state_map
+    return mac_table, active_ips
 
 def parse_arp_table():
     """Wrapper de compatibilidade que retorna o dicionário {ip: mac}."""
@@ -644,17 +725,39 @@ def probe_tcp_socket(ip, port, timeout=0.12):
 
 def send_udp_arp_nudge(ip):
     """
-    Envia datagrama UDP vazio para as portas 5353 (mDNS) e 137 (NetBIOS)
-    para forçar o kernel Linux/Android a disparar requisição ARP na wlan0.
+    Envia datagrama UDP leve para as portas 5353 (mDNS), 137 (NetBIOS) e 1900 (SSDP)
+    para forçar o kernel Linux/Android a disparar requisição ARP em camada 2 na wlan0,
+    mesmo que o host alvo bloqueie ICMP/Ping ou descarte o pacote em camada superior.
     """
-    for port in (5353, 137):
+    for port in (5353, 137, 1900):
         try:
             s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
             s.setblocking(False)
-            s.sendto(b"", (ip, port))
+            s.sendto(b"\x00", (ip, port))
             s.close()
         except Exception:
             pass
+
+def reverify_stale_neighbor(ip, timeout=0.30):
+    """
+    Executa sondagem direcionada em um vizinho que apareceu como `STALE` na tabela ARP:
+    1. Envia datagramas UDP (5353, 137, 1900) para forçar o kernel a revalidar o ARP (STALE -> DELAY/PROBE -> REACHABLE).
+    2. Tenta conexão TCP rápida com timeout de 0.30s nas portas de presença (80, 443, 62078, 445).
+    3. Executa fallback de ping rápido.
+    Retorna dict de presença caso responda em camada 3/4, ou None para depender da atualização do kernel em `ip neigh`.
+    """
+    send_udp_arp_nudge(ip)
+    for idx, port in enumerate(PHASE_A_PRESENCE_PORTS):
+        p_to = timeout if idx == 0 else min(timeout, 0.12)
+        state, lat = probe_tcp_socket(ip, port, timeout=p_to)
+        if state == "OPEN":
+            return {"ip": ip, "online": True, "open_ports": [port], "latency": round(lat or 2.0, 2), "method": "STALE_TCP_OPEN"}
+        if state == "REFUSED":
+            return {"ip": ip, "online": True, "open_ports": [], "latency": round(lat or 2.0, 2), "method": "STALE_TCP_RST"}
+    ok, lat = ping_host(ip, max_wait=0.55)
+    if ok:
+        return {"ip": ip, "online": True, "open_ports": [], "latency": round(lat or 3.5, 2), "method": "STALE_ICMP"}
+    return None
 
 def ping_host(ip, max_wait=1.0):
     """Executa `/system/bin/ping -c 1 -W 1 <ip>` retornando (True, latency_ms) se código 0."""
@@ -929,6 +1032,13 @@ def quick_presence_scan(network_cidr=None, my_ip=None, gateway_ip=None, interfac
     confirmed_online = {}
 
     # ==========================================================================
+    # PASSO 0 — Varredura UDP Leve em toda a sub-rede /24 para acordar ARP L2
+    # ==========================================================================
+    for t_ip in targets:
+        if t_ip != my_ip:
+            send_udp_arp_nudge(t_ip)
+
+    # ==========================================================================
     # PASSO 1 (Prioridade ~1s) — Verificação Imediata dos Hosts Já Conhecidos
     # ==========================================================================
     priority_ips = [ip for ip in previous_devices.keys() if ip in target_set and ip != my_ip]
@@ -938,7 +1048,7 @@ def quick_presence_scan(network_cidr=None, my_ip=None, gateway_ip=None, interfac
     if priority_ips:
         with ThreadPoolExecutor(max_workers=min(32, len(priority_ips))) as p_exec:
             f_prio = {
-                p_exec.submit(phase_a_check_presence, ip, 0.12, my_ip, gateway_ip, True): ip
+                p_exec.submit(phase_a_check_presence, ip, 0.25, my_ip, gateway_ip, True): ip
                 for ip in priority_ips
             }
             for fut in as_completed(f_prio):
@@ -950,13 +1060,13 @@ def quick_presence_scan(network_cidr=None, my_ip=None, gateway_ip=None, interfac
                     pass
 
     # ==========================================================================
-    # PASSO 2 — Varredura Rápida /24 nos Demais IPs (64 threads, timeout=0.12s)
+    # PASSO 2 — Varredura Rápida /24 nos Demais IPs (64 threads, timeout=0.15s)
     # ==========================================================================
     remaining_ips = [ip for ip in targets if ip not in confirmed_online and ip not in priority_ips]
     if remaining_ips:
         with ThreadPoolExecutor(max_workers=64) as executor:
             future_to_ip = {
-                executor.submit(phase_a_check_presence, ip, 0.12, my_ip, gateway_ip, False): ip
+                executor.submit(phase_a_check_presence, ip, 0.15, my_ip, gateway_ip, False): ip
                 for ip in remaining_ips
             }
             for future in as_completed(future_to_ip):
@@ -967,51 +1077,55 @@ def quick_presence_scan(network_cidr=None, my_ip=None, gateway_ip=None, interfac
                 except Exception:
                     pass
 
-    # Inspeciona `ip neigh show dev <interface>` (somente REACHABLE é aceito diretamente)
-    mac_table, reachable_ips = inspect_neighbor_table(interface)
-    for r_ip in reachable_ips:
+    # Inspeciona `ip neigh show dev <interface>` considerando ativos REACHABLE, DELAY e PROBE
+    neigh_res = inspect_neighbor_table(interface)
+    if isinstance(neigh_res, tuple) and len(neigh_res) == 4:
+        mac_table, active_neigh_ips, stale_neigh_ips, _ = neigh_res
+    else:
+        mac_table, active_neigh_ips = neigh_res
+        stale_neigh_ips = set()
+
+    for r_ip in active_neigh_ips:
         if r_ip in target_set and r_ip not in confirmed_online:
             confirmed_online[r_ip] = {
                 "ip": r_ip,
                 "online": True,
                 "open_ports": [],
                 "latency": 2.5,
-                "method": "ARP_REACHABLE"
+                "method": "ARP_ACTIVE"
             }
 
-    # Candidatos com MAC na tabela ARP que ainda não responderam TCP nem estavam em priority_ips
-    icmp_candidates = [
-        ip for ip in mac_table.keys()
-        if ip in target_set and ip not in confirmed_online and ip not in priority_ips and ip != my_ip
+    # Para hosts em STALE (ou presentes na mac_table mas ainda não confirmados), faz nova sondagem direcionada
+    stale_candidates = [
+        ip for ip in (set(stale_neigh_ips) | set(mac_table.keys()))
+        if ip in target_set and ip not in confirmed_online and ip != my_ip
     ]
-    if icmp_candidates:
-        with ThreadPoolExecutor(max_workers=min(32, len(icmp_candidates))) as p_exec:
-            f_ping = {p_exec.submit(ping_host, ip, 0.85): ip for ip in icmp_candidates}
-            for fut in as_completed(f_ping):
-                ip = f_ping[fut]
+    if stale_candidates:
+        with ThreadPoolExecutor(max_workers=min(32, len(stale_candidates))) as p_exec:
+            f_stale = {p_exec.submit(reverify_stale_neighbor, ip, 0.30): ip for ip in stale_candidates}
+            for fut in as_completed(f_stale):
+                ip = f_stale[fut]
                 try:
-                    ok, lat = fut.result()
-                    if ok:
-                        confirmed_online[ip] = {
-                            "ip": ip,
-                            "online": True,
-                            "open_ports": [],
-                            "latency": lat or 4.5,
-                            "method": "ICMP"
-                        }
+                    res = fut.result()
+                    if res and res.get("online"):
+                        confirmed_online[ip] = res
                 except Exception:
                     pass
 
-        mac_table_after, reachable_after = inspect_neighbor_table(interface)
+        neigh_after = inspect_neighbor_table(interface)
+        if isinstance(neigh_after, tuple) and len(neigh_after) == 4:
+            mac_table_after, active_after, _, _ = neigh_after
+        else:
+            mac_table_after, active_after = neigh_after
         mac_table.update(mac_table_after)
-        for r_ip in reachable_after:
+        for r_ip in active_after:
             if r_ip in target_set and r_ip not in confirmed_online:
                 confirmed_online[r_ip] = {
                     "ip": r_ip,
                     "online": True,
                     "open_ports": [],
                     "latency": 3.0,
-                    "method": "ARP_REACHABLE"
+                    "method": "ARP_ACTIVE"
                 }
 
     # Garante presença do Host Local
@@ -1206,15 +1320,16 @@ def quick_presence_scan(network_cidr=None, my_ip=None, gateway_ip=None, interfac
         dev["last_state_change"] = last_state_change
         dev["last_event_type"] = last_event_type
         dev["disconnections_count"] = disconnections_count
+        dev["missed_scans"] = 0
 
         cursor.execute("""
             INSERT INTO devices (
                 ip, mac, hostname, vendor, status, open_ports, latency, last_seen,
                 network_cidr, first_seen, connected_since, total_online_seconds,
                 last_state_change, last_event_type, disconnections_count, device_type,
-                service_details, previous_ports
+                service_details, previous_ports, missed_scans
             )
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0)
             ON CONFLICT(ip) DO UPDATE SET
                 mac = CASE WHEN excluded.mac != 'N/A' THEN excluded.mac ELSE devices.mac END,
                 hostname = excluded.hostname,
@@ -1231,7 +1346,8 @@ def quick_presence_scan(network_cidr=None, my_ip=None, gateway_ip=None, interfac
                 last_event_type = excluded.last_event_type,
                 disconnections_count = excluded.disconnections_count,
                 device_type = excluded.device_type,
-                service_details = excluded.service_details;
+                service_details = excluded.service_details,
+                missed_scans = 0;
         """, (
             ip,
             dev.get("mac", "N/A"),
@@ -1255,37 +1371,52 @@ def quick_presence_scan(network_cidr=None, my_ip=None, gateway_ip=None, interfac
 
         record_device_latency(conn, ip, normalized_cidr, now_iso, dev["latency"], "ONLINE")
 
-    # Transição imediata para OFFLINE dos dispositivos ausentes
+    # Histerese anti-flapping: dispositivos ausentes só mudam para OFFLINE quando missed_scans >= 3
     for prev_ip, prev_row in previous_devices.items():
         if prev_ip not in found_ips:
             if prev_row.get("status") == "ONLINE":
-                prev_seen_dt = parse_iso_datetime(prev_row.get("last_seen"))
-                delta_sec = 0
-                if prev_seen_dt:
-                    raw_delta = int((now_dt - prev_seen_dt).total_seconds())
-                    if 0 < raw_delta <= 300:
-                        delta_sec = raw_delta
-                new_total_online = int(prev_row.get("total_online_seconds") or 0) + delta_sec
-                new_disc_count = int(prev_row.get("disconnections_count") or 0) + 1
+                new_missed = int(prev_row.get("missed_scans") or 0) + 1
+                if new_missed < HYSTERESIS_MAX_MISSED_SCANS:
+                    # Mantém o host ONLINE durante falhas transitórias (1ª ou 2ª falha consecutiva)
+                    cursor.execute("""
+                        UPDATE devices
+                        SET missed_scans = ?
+                        WHERE ip = ? AND network_cidr = ?;
+                    """, (new_missed, prev_ip, normalized_cidr))
+                    retained_dev = dict(prev_row)
+                    retained_dev["missed_scans"] = new_missed
+                    retained_dev["status"] = "ONLINE"
+                    discovered_devices.append(retained_dev)
+                else:
+                    # Atingiu 3 falhas consecutivas (45s sem resposta) -> transiciona para OFFLINE
+                    prev_seen_dt = parse_iso_datetime(prev_row.get("last_seen"))
+                    delta_sec = 0
+                    if prev_seen_dt:
+                        raw_delta = int((now_dt - prev_seen_dt).total_seconds())
+                        if 0 < raw_delta <= 300:
+                            delta_sec = raw_delta
+                    new_total_online = int(prev_row.get("total_online_seconds") or 0) + delta_sec
+                    new_disc_count = int(prev_row.get("disconnections_count") or 0) + 1
 
-                cursor.execute("""
-                    UPDATE devices
-                    SET status = 'OFFLINE',
-                        connected_since = NULL,
-                        total_online_seconds = ?,
-                        disconnections_count = ?,
-                        last_state_change = ?,
-                        last_event_type = 'LEFT'
-                    WHERE ip = ? AND network_cidr = ?;
-                """, (new_total_online, new_disc_count, now_iso, prev_ip, normalized_cidr))
+                    cursor.execute("""
+                        UPDATE devices
+                        SET status = 'OFFLINE',
+                            connected_since = NULL,
+                            total_online_seconds = ?,
+                            disconnections_count = ?,
+                            last_state_change = ?,
+                            last_event_type = 'LEFT',
+                            missed_scans = ?
+                        WHERE ip = ? AND network_cidr = ?;
+                    """, (new_total_online, new_disc_count, now_iso, new_missed, prev_ip, normalized_cidr))
 
-                record_device_latency(conn, prev_ip, normalized_cidr, now_iso, None, "OFFLINE")
+                    record_device_latency(conn, prev_ip, normalized_cidr, now_iso, None, "OFFLINE")
 
-                transition_events.append((
-                    "DISCOVERY",
-                    "WARNING",
-                    f"DISPOSITIVO SAIU / OFFLINE: {prev_ip} ({prev_row.get('hostname') or 'Dispositivo na LAN'}) parou de responder em {normalized_cidr}."
-                ))
+                    transition_events.append((
+                        "DISCOVERY",
+                        "WARNING",
+                        f"DISPOSITIVO SAIU / OFFLINE: {prev_ip} ({prev_row.get('hostname') or 'Dispositivo na LAN'}) parou de responder em {normalized_cidr} após {new_missed} ciclos."
+                    ))
             else:
                 cursor.execute(
                     "UPDATE devices SET status = 'OFFLINE', connected_since = NULL WHERE ip = ? AND network_cidr = ?;",

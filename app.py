@@ -7,7 +7,8 @@ from modules.network_discovery import get_network_info
 from modules.device_discovery import (
     quick_presence_scan,
     query_filtered_devices,
-    clear_offline_devices
+    clear_offline_devices,
+    calculate_device_counts
 )
 from modules.connectivity_monitor import run_connectivity_check
 from modules.service_monitor import verify_all_services, probe_service
@@ -138,8 +139,13 @@ def api_dashboard():
     net_info = get_network_info()
 
     active_devices = query_filtered_devices(conn, net_info, scope=scope)
-    total_devices = len(active_devices)
-    online_devices = len([d for d in active_devices if d.get("status") == "ONLINE"])
+    dev_counts = calculate_device_counts(
+        active_devices,
+        my_ip=net_info.get("ip") if net_info.get("is_connected") else None,
+        gateway_ip=net_info.get("gateway") if net_info.get("is_connected") else None
+    )
+    total_devices = dev_counts["total_count"]
+    online_devices = dev_counts["online_count"]
 
     cursor.execute("""
         SELECT gateway_ip, gateway_latency, external_latency, dns_latency, classification, details, timestamp
@@ -185,6 +191,9 @@ def api_dashboard():
         "metrics": {
             "total_devices": total_devices,
             "online_devices": online_devices,
+            "offline_devices": dev_counts["offline_count"],
+            "online_clients": dev_counts["online_clients_count"],
+            "online_infra": dev_counts["online_infra_count"],
             "total_services": total_services,
             "online_services": online_services,
             "total_events": total_events,
@@ -215,12 +224,20 @@ def api_devices():
     baseline_locked = bool(b_row and int(b_row["baseline_locked"] or 0) == 1)
 
     devices = query_filtered_devices(conn, net_info, scope=scope)
+    dev_counts = calculate_device_counts(
+        devices,
+        my_ip=net_info.get("ip") if net_info.get("is_connected") else None,
+        gateway_ip=net_info.get("gateway") if net_info.get("is_connected") else None
+    )
     recent_changes = query_recent_discovery_changes(conn, net_info=net_info, limit=5)
     conn.close()
     return jsonify({
         "devices": devices,
-        "count": len(devices),
-        "online_count": len([d for d in devices if d.get("status") == "ONLINE"]),
+        "count": dev_counts["total_count"],
+        "online_count": dev_counts["online_count"],
+        "offline_count": dev_counts["offline_count"],
+        "online_clients_count": dev_counts["online_clients_count"],
+        "online_infra_count": dev_counts["online_infra_count"],
         "network_cidr": active_cidr,
         "baseline_locked": baseline_locked,
         "scope": scope,

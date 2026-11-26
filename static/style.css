@@ -587,6 +587,12 @@ body {
     border: 1px solid var(--accent-blue);
 }
 
+.role-client {
+    background-color: rgba(56, 189, 248, 0.12);
+    color: #bae6fd;
+    border: 1px solid rgba(56, 189, 248, 0.32);
+}
+
 .role-vendor {
     background-color: rgba(139, 148, 158, 0.18);
     color: var(--text-primary);

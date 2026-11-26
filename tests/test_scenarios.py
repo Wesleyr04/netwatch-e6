@@ -30,12 +30,15 @@ from modules.device_discovery import (
     GATEWAY_LABEL,
     PRIVATE_MAC_LABEL,
     GENERIC_LAN_LABEL,
+    HYSTERESIS_MAX_MISSED_SCANS,
     resolve_smart_hostname,
     resolve_vendor_oui,
     infer_device_type,
     probe_host,
     phase_a_check_presence,
+    parse_ip_neigh_output,
     inspect_neighbor_table,
+    calculate_device_counts,
     quick_presence_scan,
     query_filtered_devices,
     clear_offline_devices
@@ -76,7 +79,8 @@ class TestNetWatchE6(unittest.TestCase):
         expected_cols = {
             "network_cidr", "first_seen", "connected_since", "total_online_seconds",
             "last_state_change", "last_event_type", "disconnections_count",
-            "device_type", "service_details", "is_trusted", "custom_name", "previous_ports"
+            "device_type", "service_details", "is_trusted", "custom_name",
+            "previous_ports", "missed_scans"
         }
         for col in expected_cols:
             self.assertIn(col, cols, f"Coluna '{col}' deve existir na tabela devices.")
@@ -224,8 +228,21 @@ class TestNetWatchE6(unittest.TestCase):
         self.assertEqual(rep_remote["status"], "ONLINE")
         self.assertEqual(rep_remote["vendor"], "Motorola Mobility")
 
+        # 1ª e 2ª falhas consecutivas: histerese mantém ONLINE (missed_scans = 1 e 2)
         with patch("modules.device_discovery.phase_a_check_presence", side_effect=fake_phase_a_c2), \
-             patch("modules.device_discovery.inspect_neighbor_table", return_value=({}, set())):
+             patch("modules.device_discovery.inspect_neighbor_table", return_value=({}, set())), \
+             patch("modules.device_discovery.reverify_stale_neighbor", return_value=None):
+            quick_presence_scan("192.168.1.0/24", my_ip="192.168.1.7", gateway_ip="192.168.1.1", interface="wlan0")
+            rep_miss1 = build_device_report_dict("192.168.1.12", net_info=mock_net)
+            self.assertEqual(rep_miss1["status"], "ONLINE")
+            self.assertEqual(rep_miss1["disconnections_count"], 0)
+
+            quick_presence_scan("192.168.1.0/24", my_ip="192.168.1.7", gateway_ip="192.168.1.1", interface="wlan0")
+            rep_miss2 = build_device_report_dict("192.168.1.12", net_info=mock_net)
+            self.assertEqual(rep_miss2["status"], "ONLINE")
+            self.assertEqual(rep_miss2["disconnections_count"], 0)
+
+            # 3ª falha consecutiva (missed_scans >= 3): transiciona para OFFLINE e incrementa quedas
             quick_presence_scan("192.168.1.0/24", my_ip="192.168.1.7", gateway_ip="192.168.1.1", interface="wlan0")
 
         rep_after = build_device_report_dict("192.168.1.12", net_info=mock_net)
@@ -342,6 +359,143 @@ class TestNetWatchE6(unittest.TestCase):
         self.assertEqual(len(rogue_alerts), 1)
         self.assertEqual(rogue_alerts[0]["mitre_id"], "T1200")
         self.assertEqual(rogue_alerts[0]["severity"], "HIGH")
+
+    def test_11_hysteresis_state_machine_no_flapping(self):
+        """
+        Valida a máquina de estados com histerese (missed_scans):
+        - 1ª e 2ª falhas consecutivas mantêm o host ONLINE e não geram evento de saída.
+        - Se o host responder antes da 3ª falha, missed_scans zera para 0.
+        - Na 3ª falha consecutiva (45s), o status muda para OFFLINE e gera 1 único evento de saída.
+        """
+        self.assertEqual(HYSTERESIS_MAX_MISSED_SCANS, 3)
+        conn = get_db_connection()
+        conn.execute("DELETE FROM devices;")
+        conn.execute("DELETE FROM events;")
+        conn.commit()
+        conn.close()
+
+        def scan_with_host_online(ip, timeout=0.15, my_ip=None, gateway_ip=None, allow_icmp=False):
+            if ip in ("192.168.1.7", "192.168.1.50"):
+                return {"ip": ip, "online": True, "open_ports": [], "latency": 2.0, "method": "TCP_RST"}
+            return None
+
+        def scan_with_host_missing(ip, timeout=0.15, my_ip=None, gateway_ip=None, allow_icmp=False):
+            if ip == "192.168.1.7":
+                return {"ip": ip, "online": True, "open_ports": [], "latency": 0.1, "method": "LOCAL"}
+            return None
+
+        fake_fp = {
+            "ip": "192.168.1.50",
+            "reverse_dns": "",
+            "open_ports": "",
+            "service_details": "[]",
+            "latency": 2.0,
+            "latency_ms": 2.0,
+            "status": "ONLINE"
+        }
+
+        # Ciclo 0: Host 192.168.1.50 entra na rede
+        with patch("modules.device_discovery.phase_a_check_presence", side_effect=scan_with_host_online), \
+             patch("modules.device_discovery.inspect_neighbor_table", return_value=({"192.168.1.50": "AA:BB:CC:11:22:33"}, set())), \
+             patch("modules.device_discovery.reverify_stale_neighbor", return_value=None), \
+             patch("modules.device_discovery.deep_fingerprint_host", return_value=fake_fp):
+            quick_presence_scan("192.168.1.0/24", my_ip="192.168.1.7", gateway_ip="192.168.1.1", interface="wlan0")
+
+        # Falha 1 e Falha 2 -> continua ONLINE, missed_scans = 1 e 2
+        with patch("modules.device_discovery.phase_a_check_presence", side_effect=scan_with_host_missing), \
+             patch("modules.device_discovery.inspect_neighbor_table", return_value=({}, set())), \
+             patch("modules.device_discovery.reverify_stale_neighbor", return_value=None):
+            quick_presence_scan("192.168.1.0/24", my_ip="192.168.1.7", gateway_ip="192.168.1.1", interface="wlan0")
+            conn = get_db_connection()
+            r1 = dict(conn.execute("SELECT status, missed_scans, disconnections_count FROM devices WHERE ip='192.168.1.50';").fetchone())
+            conn.close()
+            self.assertEqual(r1["status"], "ONLINE")
+            self.assertEqual(r1["missed_scans"], 1)
+            self.assertEqual(r1["disconnections_count"], 0)
+
+            quick_presence_scan("192.168.1.0/24", my_ip="192.168.1.7", gateway_ip="192.168.1.1", interface="wlan0")
+            conn = get_db_connection()
+            r2 = dict(conn.execute("SELECT status, missed_scans, disconnections_count FROM devices WHERE ip='192.168.1.50';").fetchone())
+            conn.close()
+            self.assertEqual(r2["status"], "ONLINE")
+            self.assertEqual(r2["missed_scans"], 2)
+            self.assertEqual(r2["disconnections_count"], 0)
+
+        # Host responde no ciclo seguinte -> zera missed_scans = 0 sem ter gerado desconexão
+        with patch("modules.device_discovery.phase_a_check_presence", side_effect=scan_with_host_online), \
+             patch("modules.device_discovery.inspect_neighbor_table", return_value=({"192.168.1.50": "AA:BB:CC:11:22:33"}, set())), \
+             patch("modules.device_discovery.reverify_stale_neighbor", return_value=None):
+            quick_presence_scan("192.168.1.0/24", my_ip="192.168.1.7", gateway_ip="192.168.1.1", interface="wlan0")
+            conn = get_db_connection()
+            r_rec = dict(conn.execute("SELECT status, missed_scans, disconnections_count FROM devices WHERE ip='192.168.1.50';").fetchone())
+            conn.close()
+            self.assertEqual(r_rec["status"], "ONLINE")
+            self.assertEqual(r_rec["missed_scans"], 0)
+            self.assertEqual(r_rec["disconnections_count"], 0)
+
+        # Agora 3 falhas consecutivas -> na 3ª muda para OFFLINE e gera 1 único evento de saída
+        with patch("modules.device_discovery.phase_a_check_presence", side_effect=scan_with_host_missing), \
+             patch("modules.device_discovery.inspect_neighbor_table", return_value=({}, set())), \
+             patch("modules.device_discovery.reverify_stale_neighbor", return_value=None):
+            for _ in range(4):
+                quick_presence_scan("192.168.1.0/24", my_ip="192.168.1.7", gateway_ip="192.168.1.1", interface="wlan0")
+
+        conn = get_db_connection()
+        r_off = dict(conn.execute("SELECT status, missed_scans, disconnections_count FROM devices WHERE ip='192.168.1.50';").fetchone())
+        leave_events = conn.execute(
+            "SELECT COUNT(*) FROM events WHERE event_type='DISCOVERY' AND message LIKE 'DISPOSITIVO SAIU%192.168.1.50%';"
+        ).fetchone()[0]
+        conn.close()
+
+        self.assertEqual(r_off["status"], "OFFLINE")
+        self.assertGreaterEqual(r_off["missed_scans"], 3)
+        self.assertEqual(r_off["disconnections_count"], 1)
+        self.assertEqual(leave_events, 1)
+
+    def test_12_ip_neigh_parser_all_states_and_stale_reprobe(self):
+        """
+        Valida o parser de `ip neigh` com diferentes estados:
+        - REACHABLE, DELAY e PROBE são classificados imediatamente como ativos (`active_ips`).
+        - STALE vai para `stale_ips` para nova sondagem direcionada antes de ser descartado.
+        - FAILED e INCOMPLETE são ignorados como inativos.
+        """
+        sample_neigh = "\n".join([
+            "192.168.1.1 lladdr 14:09:b4:a6:f3:5f REACHABLE",
+            "192.168.1.20 lladdr aa:bb:cc:dd:ee:01 DELAY",
+            "192.168.1.21 lladdr aa:bb:cc:dd:ee:02 PROBE",
+            "192.168.1.30 lladdr aa:bb:cc:dd:ee:03 STALE",
+            "192.168.1.40 FAILED",
+            "192.168.1.41 INCOMPLETE"
+        ])
+        mac_table, active_ips, stale_ips, state_map = parse_ip_neigh_output(sample_neigh)
+
+        self.assertEqual(active_ips, {"192.168.1.1", "192.168.1.20", "192.168.1.21"})
+        self.assertEqual(stale_ips, {"192.168.1.30"})
+        self.assertNotIn("192.168.1.40", active_ips)
+        self.assertNotIn("192.168.1.40", stale_ips)
+        self.assertNotIn("192.168.1.41", active_ips)
+        self.assertEqual(mac_table["192.168.1.20"], "AA:BB:CC:DD:EE:01")
+        self.assertEqual(state_map["192.168.1.21"], "PROBE")
+
+    def test_13_device_counts_online_vs_offline_and_infra(self):
+        """
+        Valida o cálculo de contagem de dispositivos ONLINE vs histórico OFFLINE e
+        a separação entre clientes reais e infraestrutura (Gateway / Host Local).
+        """
+        sample_devices = [
+            {"ip": "192.168.1.7", "status": "ONLINE"},    # Host Local (Infra)
+            {"ip": "192.168.1.1", "status": "ONLINE"},    # Gateway (Infra)
+            {"ip": "192.168.1.12", "status": "ONLINE"},   # Cliente 1 Online
+            {"ip": "192.168.1.15", "status": "ONLINE"},   # Cliente 2 Online
+            {"ip": "192.168.1.80", "status": "OFFLINE"},  # Histórico Offline 1
+            {"ip": "192.168.1.99", "status": "OFFLINE"},  # Histórico Offline 2
+        ]
+        counts = calculate_device_counts(sample_devices, my_ip="192.168.1.7", gateway_ip="192.168.1.1")
+        self.assertEqual(counts["online_count"], 4)
+        self.assertEqual(counts["offline_count"], 2)
+        self.assertEqual(counts["total_count"], 6)
+        self.assertEqual(counts["online_infra_count"], 2)
+        self.assertEqual(counts["online_clients_count"], 2)
 
 if __name__ == "__main__":
     unittest.main()

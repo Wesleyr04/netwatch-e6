@@ -77,7 +77,8 @@ def init_db():
         service_details TEXT DEFAULT '[]',
         is_trusted INTEGER DEFAULT 0,
         custom_name TEXT DEFAULT '',
-        previous_ports TEXT DEFAULT ''
+        previous_ports TEXT DEFAULT '',
+        missed_scans INTEGER DEFAULT 0
     );
     """)
 
@@ -97,7 +98,8 @@ def init_db():
         ("service_details", "TEXT DEFAULT '[]'"),
         ("is_trusted", "INTEGER DEFAULT 0"),
         ("custom_name", "TEXT DEFAULT ''"),
-        ("previous_ports", "TEXT DEFAULT ''")
+        ("previous_ports", "TEXT DEFAULT ''"),
+        ("missed_scans", "INTEGER DEFAULT 0")
     ]
     for col_name, col_def in migrations:
         if col_name not in existing_cols:
