@@ -37,8 +37,8 @@ scan_lock = threading.Lock()
 
 @app.after_request
 def apply_no_cache_headers(response):
-    """Garante que nenhuma resposta de /api/* ou Service Worker seja cacheada pelo WebView/Chrome."""
-    if request.path.startswith("/api/") or request.path in ("/sw.js", "/manifest.json", "/"):
+    """Garante que nenhuma resposta de /api/*, assets estáticos ou Service Worker seja cacheada pelo WebView/Chrome."""
+    if request.path.startswith("/api/") or request.path.startswith("/static/") or request.path in ("/sw.js", "/manifest.json", "/"):
         response.headers["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
         response.headers["Pragma"] = "no-cache"
         response.headers["Expires"] = "0"
@@ -81,7 +81,7 @@ def run_discovery_cycle(force_deep=False):
 def presence_monitor_worker():
     """
     Thread daemon rápida: executa `quick_presence_scan()` + sensores SOC de LAN
-    a cada 15 segundos sem bloquear requisições HTTP.
+    a cada 10 segundos sem bloquear requisições HTTP.
     """
     time.sleep(1.0)
     while True:
@@ -90,7 +90,7 @@ def presence_monitor_worker():
                 run_discovery_cycle(force_deep=False)
         except Exception as e:
             print(f"[PRESENCE WORKER] Erro: {e}")
-        time.sleep(15)
+        time.sleep(10)
 
 def connectivity_and_services_worker():
     """

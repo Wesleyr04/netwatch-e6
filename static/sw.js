@@ -1,8 +1,8 @@
-const CACHE_NAME = "netwatch-e6-v5";
+const CACHE_NAME = "netwatch-e6-v6";
 const STATIC_ASSETS = [
   "/",
-  "/static/style.css",
-  "/static/app.js",
+  "/static/style.css?v=6",
+  "/static/app.js?v=6",
   "/static/manifest.json",
   "/static/icon.svg"
 ];

@@ -48,8 +48,8 @@ GENERIC_LAN_LABEL = "Dispositivo na LAN"
 # Janela de destaque visual (segundos) para entradas/saídas recentes
 RECENT_CHANGE_WINDOW_SECONDS = 180
 
-# Histerese anti-flapping: número de ciclos consecutivos sem resposta (3 x 15s = 45s) para marcar OFFLINE
-HYSTERESIS_MAX_MISSED_SCANS = 3
+# Histerese anti-flapping: número de ciclos consecutivos sem resposta (2 x 10s = 20s) para marcar OFFLINE
+HYSTERESIS_MAX_MISSED_SCANS = 2
 
 # Estados ativos da tabela de vizinhos (`ip neigh`) que comprovam presença recente em camada 2
 ACTIVE_NEIGHBOR_STATES = {"REACHABLE", "DELAY", "PROBE"}
@@ -1371,13 +1371,13 @@ def quick_presence_scan(network_cidr=None, my_ip=None, gateway_ip=None, interfac
 
         record_device_latency(conn, ip, normalized_cidr, now_iso, dev["latency"], "ONLINE")
 
-    # Histerese anti-flapping: dispositivos ausentes só mudam para OFFLINE quando missed_scans >= 3
+    # Histerese anti-flapping: dispositivos ausentes só mudam para OFFLINE quando missed_scans >= 2 (20s)
     for prev_ip, prev_row in previous_devices.items():
         if prev_ip not in found_ips:
             if prev_row.get("status") == "ONLINE":
                 new_missed = int(prev_row.get("missed_scans") or 0) + 1
                 if new_missed < HYSTERESIS_MAX_MISSED_SCANS:
-                    # Mantém o host ONLINE durante falhas transitórias (1ª ou 2ª falha consecutiva)
+                    # Mantém o host ONLINE durante falha transitória (1ª falha consecutiva)
                     cursor.execute("""
                         UPDATE devices
                         SET missed_scans = ?
@@ -1388,7 +1388,7 @@ def quick_presence_scan(network_cidr=None, my_ip=None, gateway_ip=None, interfac
                     retained_dev["status"] = "ONLINE"
                     discovered_devices.append(retained_dev)
                 else:
-                    # Atingiu 3 falhas consecutivas (45s sem resposta) -> transiciona para OFFLINE
+                    # Atingiu 2 falhas consecutivas (20s sem resposta) -> transiciona para OFFLINE
                     prev_seen_dt = parse_iso_datetime(prev_row.get("last_seen"))
                     delta_sec = 0
                     if prev_seen_dt:

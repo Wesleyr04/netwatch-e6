@@ -68,6 +68,7 @@ document.addEventListener("DOMContentLoaded", () => {
     const wifiWarningBanner = document.getElementById("wifi-warning-banner");
     const wifiWarningText = document.getElementById("wifi-warning-text");
     const devicesSubnetSubtitle = document.getElementById("devices-subnet-subtitle");
+    const devicesSummaryBadges = document.getElementById("devices-summary-badges");
     const recentChangesList = document.getElementById("recent-changes-list");
 
     const connPill = document.getElementById("conn-pill");
@@ -449,7 +450,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
             const onlineDevs = data.metrics.online_devices !== undefined
                 ? data.metrics.online_devices
-                : (data.metrics.total_devices || 0);
+                : 0;
             devCount.textContent = onlineDevs;
             srvCount.textContent = data.metrics.total_services || 0;
             updateSocNavBadge(data.metrics.soc_open_alerts, data.metrics.soc_posture);
@@ -551,20 +552,27 @@ document.addEventListener("DOMContentLoaded", () => {
             const devs = data.devices || [];
             currentBaselineLocked = Boolean(data.baseline_locked);
 
+            const onlineDevsList = devs.filter(d => d.status === "ONLINE");
             const onlineCount = data.online_count !== undefined
                 ? data.online_count
-                : devs.filter(d => d.status === "ONLINE").length;
+                : onlineDevsList.length;
             const offlineCount = data.offline_count !== undefined
                 ? data.offline_count
-                : (devs.length - onlineCount);
-            const clientsOnline = data.online_clients_count !== undefined
-                ? data.online_clients_count
-                : Math.max(0, onlineCount - 2);
+                : Math.max(0, devs.length - onlineCount);
             const infraOnline = data.online_infra_count !== undefined
                 ? data.online_infra_count
-                : Math.max(0, onlineCount - clientsOnline);
+                : onlineDevsList.filter(d => d.ip === currentNetwork.ip || d.ip === currentNetwork.gateway).length;
+            const clientsOnline = data.online_clients_count !== undefined
+                ? data.online_clients_count
+                : Math.max(0, onlineCount - infraOnline);
 
             devCount.textContent = onlineCount;
+            if (devicesSummaryBadges) {
+                devicesSummaryBadges.innerHTML =
+                    `<span class="role-badge role-client">${clientsOnline} Cliente(s)</span>` +
+                    `<span class="role-badge role-gateway">${infraOnline} Infra (Gateway + Host Local)</span>` +
+                    (offlineCount > 0 ? `<span class="role-badge role-vendor">${offlineCount} Offline</span>` : "");
+            }
             if (devicesSubnetSubtitle && currentNetwork.is_connected && currentNetwork.network_cidr) {
                 const lastScanSuffix = data.last_scan_time ? ` • Última verificação: ${data.last_scan_time}` : "";
                 devicesSubnetSubtitle.textContent =

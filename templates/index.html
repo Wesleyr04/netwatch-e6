@@ -12,7 +12,7 @@
     <link rel="manifest" href="/static/manifest.json">
     <link rel="icon" type="image/svg+xml" href="/static/icon.svg">
     <link rel="apple-touch-icon" href="/static/icon.svg">
-    <link rel="stylesheet" href="/static/style.css">
+    <link rel="stylesheet" href="/static/style.css?v=6">
 </head>
 <body>
     <header class="navbar">
@@ -105,7 +105,7 @@
             <div id="recent-changes-card" class="card recent-changes-card">
                 <div class="recent-changes-header">
                     <span class="recent-changes-title">&#x1F4E1; Movimentação Recente na Rede</span>
-                    <span class="text-muted text-small">Monitoramento contínuo (15s) &bull; Toque em um host para abrir o relatório</span>
+                    <span class="text-muted text-small">Monitoramento contínuo (10s) &bull; Toque em um host para abrir o relatório</span>
                 </div>
                 <div id="recent-changes-list" class="recent-changes-list">
                     <span class="text-muted text-small">Aguardando eventos de movimentação na sub-rede atual...</span>
@@ -115,7 +115,10 @@
             <div class="card">
                 <div class="card-header-flex">
                     <div>
-                        <h3>Dispositivos na Rede Local (/24)</h3>
+                        <div class="devices-title-row">
+                            <h3>Dispositivos na Rede Local (/24)</h3>
+                            <span id="devices-summary-badges" class="devices-summary-badges"></span>
+                        </div>
                         <p id="devices-subnet-subtitle" class="text-muted text-small">Toque em qualquer dispositivo para abrir o Relatório Individual</p>
                     </div>
                     <div class="btn-group">
@@ -460,6 +463,6 @@
         <p>NetWatch E6 &bull; Motorola Moto E6 Play (MT6739WW / Android 9 Pie) &bull; Bind Seguro 127.0.0.1:5000</p>
     </footer>
 
-    <script src="/static/app.js"></script>
+    <script src="/static/app.js?v=6"></script>
 </body>
 </html>

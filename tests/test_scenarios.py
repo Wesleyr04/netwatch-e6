@@ -228,7 +228,7 @@ class TestNetWatchE6(unittest.TestCase):
         self.assertEqual(rep_remote["status"], "ONLINE")
         self.assertEqual(rep_remote["vendor"], "Motorola Mobility")
 
-        # 1ª e 2ª falhas consecutivas: histerese mantém ONLINE (missed_scans = 1 e 2)
+        # 1ª falha consecutiva: histerese mantém ONLINE (missed_scans = 1)
         with patch("modules.device_discovery.phase_a_check_presence", side_effect=fake_phase_a_c2), \
              patch("modules.device_discovery.inspect_neighbor_table", return_value=({}, set())), \
              patch("modules.device_discovery.reverify_stale_neighbor", return_value=None):
@@ -237,12 +237,7 @@ class TestNetWatchE6(unittest.TestCase):
             self.assertEqual(rep_miss1["status"], "ONLINE")
             self.assertEqual(rep_miss1["disconnections_count"], 0)
 
-            quick_presence_scan("192.168.1.0/24", my_ip="192.168.1.7", gateway_ip="192.168.1.1", interface="wlan0")
-            rep_miss2 = build_device_report_dict("192.168.1.12", net_info=mock_net)
-            self.assertEqual(rep_miss2["status"], "ONLINE")
-            self.assertEqual(rep_miss2["disconnections_count"], 0)
-
-            # 3ª falha consecutiva (missed_scans >= 3): transiciona para OFFLINE e incrementa quedas
+            # 2ª falha consecutiva (missed_scans >= 2, 20s): transiciona para OFFLINE e incrementa quedas
             quick_presence_scan("192.168.1.0/24", my_ip="192.168.1.7", gateway_ip="192.168.1.1", interface="wlan0")
 
         rep_after = build_device_report_dict("192.168.1.12", net_info=mock_net)
@@ -362,12 +357,12 @@ class TestNetWatchE6(unittest.TestCase):
 
     def test_11_hysteresis_state_machine_no_flapping(self):
         """
-        Valida a máquina de estados com histerese (missed_scans):
-        - 1ª e 2ª falhas consecutivas mantêm o host ONLINE e não geram evento de saída.
-        - Se o host responder antes da 3ª falha, missed_scans zera para 0.
-        - Na 3ª falha consecutiva (45s), o status muda para OFFLINE e gera 1 único evento de saída.
+        Valida a máquina de estados com histerese (missed_scans >= 2, ciclo de 10s = 20s):
+        - 1ª falha consecutiva mantém o host ONLINE e não gera evento de saída.
+        - Se o host responder antes da 2ª falha, missed_scans zera para 0.
+        - Na 2ª falha consecutiva (20s), o status muda para OFFLINE e gera 1 único evento de saída.
         """
-        self.assertEqual(HYSTERESIS_MAX_MISSED_SCANS, 3)
+        self.assertEqual(HYSTERESIS_MAX_MISSED_SCANS, 2)
         conn = get_db_connection()
         conn.execute("DELETE FROM devices;")
         conn.execute("DELETE FROM events;")
@@ -401,7 +396,7 @@ class TestNetWatchE6(unittest.TestCase):
              patch("modules.device_discovery.deep_fingerprint_host", return_value=fake_fp):
             quick_presence_scan("192.168.1.0/24", my_ip="192.168.1.7", gateway_ip="192.168.1.1", interface="wlan0")
 
-        # Falha 1 e Falha 2 -> continua ONLINE, missed_scans = 1 e 2
+        # Falha 1 -> continua ONLINE, missed_scans = 1
         with patch("modules.device_discovery.phase_a_check_presence", side_effect=scan_with_host_missing), \
              patch("modules.device_discovery.inspect_neighbor_table", return_value=({}, set())), \
              patch("modules.device_discovery.reverify_stale_neighbor", return_value=None):
@@ -412,14 +407,6 @@ class TestNetWatchE6(unittest.TestCase):
             self.assertEqual(r1["status"], "ONLINE")
             self.assertEqual(r1["missed_scans"], 1)
             self.assertEqual(r1["disconnections_count"], 0)
-
-            quick_presence_scan("192.168.1.0/24", my_ip="192.168.1.7", gateway_ip="192.168.1.1", interface="wlan0")
-            conn = get_db_connection()
-            r2 = dict(conn.execute("SELECT status, missed_scans, disconnections_count FROM devices WHERE ip='192.168.1.50';").fetchone())
-            conn.close()
-            self.assertEqual(r2["status"], "ONLINE")
-            self.assertEqual(r2["missed_scans"], 2)
-            self.assertEqual(r2["disconnections_count"], 0)
 
         # Host responde no ciclo seguinte -> zera missed_scans = 0 sem ter gerado desconexão
         with patch("modules.device_discovery.phase_a_check_presence", side_effect=scan_with_host_online), \
@@ -433,11 +420,11 @@ class TestNetWatchE6(unittest.TestCase):
             self.assertEqual(r_rec["missed_scans"], 0)
             self.assertEqual(r_rec["disconnections_count"], 0)
 
-        # Agora 3 falhas consecutivas -> na 3ª muda para OFFLINE e gera 1 único evento de saída
+        # Agora 2 falhas consecutivas -> na 2ª muda para OFFLINE e gera 1 único evento de saída
         with patch("modules.device_discovery.phase_a_check_presence", side_effect=scan_with_host_missing), \
              patch("modules.device_discovery.inspect_neighbor_table", return_value=({}, set())), \
              patch("modules.device_discovery.reverify_stale_neighbor", return_value=None):
-            for _ in range(4):
+            for _ in range(3):
                 quick_presence_scan("192.168.1.0/24", my_ip="192.168.1.7", gateway_ip="192.168.1.1", interface="wlan0")
 
         conn = get_db_connection()
@@ -448,7 +435,7 @@ class TestNetWatchE6(unittest.TestCase):
         conn.close()
 
         self.assertEqual(r_off["status"], "OFFLINE")
-        self.assertGreaterEqual(r_off["missed_scans"], 3)
+        self.assertGreaterEqual(r_off["missed_scans"], 2)
         self.assertEqual(r_off["disconnections_count"], 1)
         self.assertEqual(leave_events, 1)
 
